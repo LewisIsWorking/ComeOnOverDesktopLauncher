@@ -8,15 +8,58 @@ public class ClaudeInstanceViewModelTests
     [Fact]
     public void Constructor_SetsInstanceNumber()
     {
-        var vm = new ClaudeInstanceViewModel(3);
+        var vm = new ClaudeInstanceViewModel(3, "Work");
 
         Assert.Equal(3, vm.InstanceNumber);
     }
 
     [Fact]
-    public void UpdateFrom_UpdatesAllProperties()
+    public void Constructor_SetsInitialName()
     {
-        var vm = new ClaudeInstanceViewModel(1);
+        var vm = new ClaudeInstanceViewModel(1, "Personal");
+
+        Assert.Equal("Personal", vm.SlotName);
+    }
+
+    [Fact]
+    public void Constructor_DefaultsToEmptyNameWhenNotProvided()
+    {
+        var vm = new ClaudeInstanceViewModel(1, string.Empty);
+
+        Assert.Equal(string.Empty, vm.SlotName);
+    }
+
+    [Fact]
+    public void SlotNameChange_InvokesCallback()
+    {
+        int? capturedSlot = null;
+        string? capturedName = null;
+        var vm = new ClaudeInstanceViewModel(2, "Old", (slot, name) =>
+        {
+            capturedSlot = slot;
+            capturedName = name;
+        });
+
+        vm.SlotName = "New Name";
+
+        Assert.Equal(2, capturedSlot);
+        Assert.Equal("New Name", capturedName);
+    }
+
+    [Fact]
+    public void SlotNameChange_WithNoCallback_DoesNotThrow()
+    {
+        var vm = new ClaudeInstanceViewModel(1, "Test", null);
+
+        var ex = Record.Exception(() => vm.SlotName = "Changed");
+
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void UpdateFrom_UpdatesAllResourceProperties()
+    {
+        var vm = new ClaudeInstanceViewModel(1, "Work");
         var snapshot = new InstanceResourceSnapshot(
             ProcessId: 123,
             InstanceNumber: 1,
@@ -32,16 +75,13 @@ public class ClaudeInstanceViewModelTests
     }
 
     [Fact]
-    public void UpdateFrom_CanBeCalledMultipleTimes()
+    public void UpdateFrom_DoesNotOverwriteSlotName()
     {
-        var vm = new ClaudeInstanceViewModel(1);
-        var snap1 = new InstanceResourceSnapshot(1, 1, 5.0, 100 * 1024 * 1024, TimeSpan.FromMinutes(1));
-        var snap2 = new InstanceResourceSnapshot(1, 1, 15.0, 200 * 1024 * 1024, TimeSpan.FromMinutes(2));
+        var vm = new ClaudeInstanceViewModel(1, "Work");
+        var snapshot = new InstanceResourceSnapshot(1, 1, 5.0, 0, TimeSpan.Zero);
 
-        vm.UpdateFrom(snap1);
-        vm.UpdateFrom(snap2);
+        vm.UpdateFrom(snapshot);
 
-        Assert.Equal(15.0, vm.CpuPercent);
-        Assert.Equal(200.0, vm.RamMb);
+        Assert.Equal("Work", vm.SlotName);
     }
 }

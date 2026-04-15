@@ -15,9 +15,9 @@ public class MainWindowViewModelTests
     private readonly IClaudePathResolver _pathResolver = Substitute.For<IClaudePathResolver>();
     private readonly IResourceMonitor _resourceMonitor = Substitute.For<IResourceMonitor>();
 
-    private MainWindowViewModel CreateSut()
+    private MainWindowViewModel CreateSut(AppSettings? settings = null)
     {
-        _settingsService.Load().Returns(new AppSettings { DefaultSlotCount = 2 });
+        _settingsService.Load().Returns(settings ?? new AppSettings { DefaultSlotCount = 2 });
         return new MainWindowViewModel(
             _launcher, _slotManager, _cooService,
             _settingsService, _pathResolver, _resourceMonitor);
@@ -131,16 +131,46 @@ public class MainWindowViewModelTests
     public void RefreshResourcesCommand_SyncsInstanceCollection()
     {
         var sut = CreateSut();
-        var snapshots = new List<InstanceResourceSnapshot>
+        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>
         {
             new(1, 1, 5.0, 200 * 1024 * 1024, TimeSpan.FromMinutes(10))
-        };
-        _resourceMonitor.GetSnapshots().Returns(snapshots);
+        });
 
         sut.RefreshResourcesCommand.Execute(null);
 
         Assert.Single(sut.Instances);
         Assert.Equal(5.0, sut.Instances[0].CpuPercent);
+    }
+
+    [Fact]
+    public void RefreshResourcesCommand_UsesStoredSlotNameForNewInstances()
+    {
+        var settings = new AppSettings { DefaultSlotCount = 2 };
+        settings.SlotNames[1] = "Work";
+        var sut = CreateSut(settings);
+        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>
+        {
+            new(1, 1, 0, 0, TimeSpan.Zero)
+        });
+
+        sut.RefreshResourcesCommand.Execute(null);
+
+        Assert.Equal("Work", sut.Instances[0].SlotName);
+    }
+
+    [Fact]
+    public void SlotNameChange_PersistsToSettings()
+    {
+        var sut = CreateSut();
+        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>
+        {
+            new(1, 1, 0, 0, TimeSpan.Zero)
+        });
+        sut.RefreshResourcesCommand.Execute(null);
+
+        sut.Instances[0].SlotName = "Research";
+
+        _settingsService.Received().Save(Arg.Is<AppSettings>(s => s.SlotNames[1] == "Research"));
     }
 
     [Fact]

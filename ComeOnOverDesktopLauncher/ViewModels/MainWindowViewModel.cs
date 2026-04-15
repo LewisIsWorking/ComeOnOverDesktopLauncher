@@ -19,6 +19,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly DispatcherTimer _refreshTimer;
+    private AppSettings _settings;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasRunningInstances))]
@@ -47,8 +48,8 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
 
-        var settings = _settingsService.Load();
-        _slotCount = settings.DefaultSlotCount;
+        _settings = _settingsService.Load();
+        _slotCount = _settings.DefaultSlotCount;
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
@@ -96,7 +97,14 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void SaveSettings()
     {
-        _settingsService.Save(new AppSettings { DefaultSlotCount = SlotCount });
+        _settings.DefaultSlotCount = SlotCount;
+        _settingsService.Save(_settings);
+    }
+
+    private void OnSlotNameChanged(int slotNumber, string name)
+    {
+        _settings.SlotNames[slotNumber] = name;
+        SaveSettings();
     }
 
     private void SyncInstanceCollection(IReadOnlyList<InstanceResourceSnapshot> snapshots)
@@ -107,7 +115,13 @@ public partial class MainWindowViewModel : ObservableObject
         for (var i = 0; i < snapshots.Count; i++)
         {
             if (i >= Instances.Count)
-                Instances.Add(new ClaudeInstanceViewModel(snapshots[i].InstanceNumber));
+            {
+                var num = snapshots[i].InstanceNumber;
+                Instances.Add(new ClaudeInstanceViewModel(
+                    num,
+                    _settings.GetSlotName(num),
+                    OnSlotNameChanged));
+            }
 
             Instances[i].UpdateFrom(snapshots[i]);
         }

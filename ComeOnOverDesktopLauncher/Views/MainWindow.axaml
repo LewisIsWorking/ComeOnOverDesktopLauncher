@@ -4,8 +4,8 @@
         x:Class="ComeOnOverDesktopLauncher.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="ComeOnOver Desktop Launcher"
-        Width="420" Height="480"
-        MinWidth="340" MinHeight="360"
+        Width="440" Height="500"
+        MinWidth="360" MinHeight="380"
         WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
@@ -72,29 +72,42 @@
                           IsVisible="{Binding HasRunningInstances}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:ClaudeInstanceViewModel">
-                        <Border BorderThickness="0,0,0,1" Padding="0,6">
-                            <Grid ColumnDefinitions="80,*,*,*">
-                                <TextBlock Grid.Column="0"
-                                           Text="{Binding InstanceNumber, StringFormat='Instance {0}'}"
-                                           FontSize="12" VerticalAlignment="Center"/>
-                                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <Border BorderThickness="0,0,0,1" Padding="0,8">
+                            <Grid ColumnDefinitions="*,60,60,60" RowDefinitions="Auto,Auto">
+
+                                <!-- Editable slot name -->
+                                <TextBox Grid.Row="0" Grid.Column="0"
+                                         Text="{Binding SlotName}"
+                                         FontSize="12" FontWeight="SemiBold"
+                                         BorderThickness="0"
+                                         Background="Transparent"
+                                         Padding="0,0,8,2"
+                                         PlaceholderText="Name this slot..."/>
+
+                                <!-- CPU -->
+                                <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center">
                                     <TextBlock Text="CPU" FontSize="9" Foreground="Gray"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding CpuPercent, StringFormat='{}{0}%'}"
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+
+                                <!-- RAM -->
+                                <StackPanel Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center">
                                     <TextBlock Text="RAM" FontSize="9" Foreground="Gray"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding RamMb, StringFormat='{}{0} MB'}"
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
-                                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
+
+                                <!-- Uptime -->
+                                <StackPanel Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center">
                                     <TextBlock Text="Up" FontSize="9" Foreground="Gray"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding UptimeDisplay}"
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
+
                             </Grid>
                         </Border>
                     </DataTemplate>
