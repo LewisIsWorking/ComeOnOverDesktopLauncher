@@ -26,9 +26,13 @@ public class SlotManager : ISlotManager
             .ToList();
     }
 
+    /// <summary>
+    /// Returns the next slot based on windowed instance count.
+    /// Avoids counting Electron's many background child processes.
+    /// </summary>
     public LaunchSlot GetNextAvailableSlot()
     {
-        var runningCount = _processService.CountByName("claude");
+        var runningCount = _processService.CountByNameWithWindow("claude");
         return new LaunchSlot(runningCount + 1);
     }
 }

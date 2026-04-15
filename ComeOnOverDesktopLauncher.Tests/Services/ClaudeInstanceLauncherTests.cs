@@ -32,10 +32,20 @@ public class ClaudeInstanceLauncherTests
     }
 
     [Fact]
-    public void GetRunningInstanceCount_ReturnsProcessCount()
+    public void GetRunningInstanceCount_UsesWindowedCount()
     {
-        _processService.CountByName("claude").Returns(3);
+        _processService.CountByNameWithWindow("claude").Returns(3);
 
         Assert.Equal(3, CreateSut().GetRunningInstanceCount());
+    }
+
+    [Fact]
+    public void GetRunningInstanceCount_DoesNotUseRawCount()
+    {
+        _processService.CountByNameWithWindow("claude").Returns(3);
+
+        CreateSut().GetRunningInstanceCount();
+
+        _processService.DidNotReceive().CountByName(Arg.Any<string>());
     }
 }

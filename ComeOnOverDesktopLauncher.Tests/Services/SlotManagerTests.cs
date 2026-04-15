@@ -32,9 +32,9 @@ public class SlotManagerTests
     }
 
     [Fact]
-    public void GetNextAvailableSlot_ReturnsRunningCountPlusOne()
+    public void GetNextAvailableSlot_UsesWindowedCountPlusOne()
     {
-        _processService.CountByName("claude").Returns(2);
+        _processService.CountByNameWithWindow("claude").Returns(2);
 
         Assert.Equal(3, CreateSut().GetNextAvailableSlot().SlotNumber);
     }
@@ -42,8 +42,18 @@ public class SlotManagerTests
     [Fact]
     public void GetNextAvailableSlot_WhenNoneRunning_ReturnsSlotOne()
     {
-        _processService.CountByName("claude").Returns(0);
+        _processService.CountByNameWithWindow("claude").Returns(0);
 
         Assert.Equal(1, CreateSut().GetNextAvailableSlot().SlotNumber);
+    }
+
+    [Fact]
+    public void GetNextAvailableSlot_DoesNotUseRawCount()
+    {
+        _processService.CountByNameWithWindow("claude").Returns(0);
+
+        CreateSut().GetNextAvailableSlot();
+
+        _processService.DidNotReceive().CountByName(Arg.Any<string>());
     }
 }

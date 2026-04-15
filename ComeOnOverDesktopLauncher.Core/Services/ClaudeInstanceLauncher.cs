@@ -30,6 +30,10 @@ public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
         _processService.Start(exePath, $"--user-data-dir=\"{dataDir}\"");
     }
 
+    /// <summary>
+    /// Returns the number of Claude instances with a visible window.
+    /// Uses windowed count to avoid counting Electron's many background child processes.
+    /// </summary>
     public int GetRunningInstanceCount() =>
-        _processService.CountByName("claude");
+        _processService.CountByNameWithWindow("claude");
 }

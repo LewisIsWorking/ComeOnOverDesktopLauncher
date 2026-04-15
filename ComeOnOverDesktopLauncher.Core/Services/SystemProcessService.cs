@@ -20,4 +20,8 @@ public class SystemProcessService : IProcessService
 
     public int CountByName(string processName) =>
         Process.GetProcessesByName(processName).Length;
+
+    public int CountByNameWithWindow(string processName) =>
+        Process.GetProcessesByName(processName)
+            .Count(p => p.MainWindowHandle != IntPtr.Zero);
 }
