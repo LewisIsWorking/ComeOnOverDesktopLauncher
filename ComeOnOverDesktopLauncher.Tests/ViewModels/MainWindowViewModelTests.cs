@@ -35,6 +35,14 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Constructor_LoadsRunningInstanceCount()
+    {
+        _launcher.GetRunningInstanceCount().Returns(3);
+
+        Assert.Equal(3, CreateSut().RunningInstanceCount);
+    }
+
+    [Fact]
     public void LaunchInstancesCommand_LaunchesCorrectNumberOfSlots()
     {
         _slotManager.GetSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
@@ -46,9 +54,22 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void LaunchInstancesCommand_UpdatesRunningInstanceCount()
+    {
+        _slotManager.GetSlots(Arg.Any<int>()).Returns([new LaunchSlot(1)]);
+        _launcher.GetRunningInstanceCount().Returns(2);
+        var sut = CreateSut();
+
+        sut.LaunchInstancesCommand.Execute(null);
+
+        Assert.Equal(2, sut.RunningInstanceCount);
+    }
+
+    [Fact]
     public void LaunchInstancesCommand_UpdatesStatusMessage()
     {
         _slotManager.GetSlots(Arg.Any<int>()).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
+        _launcher.GetRunningInstanceCount().Returns(2);
         var sut = CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);
@@ -83,6 +104,17 @@ public class MainWindowViewModelTests
         sut.LaunchComeOnOverCommand.Execute(null);
 
         Assert.Contains("ComeOnOver", sut.StatusMessage);
+    }
+
+    [Fact]
+    public void RefreshInstanceCountCommand_UpdatesRunningInstanceCount()
+    {
+        _launcher.GetRunningInstanceCount().Returns(5);
+        var sut = CreateSut();
+
+        sut.RefreshInstanceCountCommand.Execute(null);
+
+        Assert.Equal(5, sut.RunningInstanceCount);
     }
 
     [Fact]

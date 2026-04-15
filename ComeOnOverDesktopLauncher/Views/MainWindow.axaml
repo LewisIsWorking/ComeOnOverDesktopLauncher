@@ -4,8 +4,8 @@
         x:Class="ComeOnOverDesktopLauncher.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="ComeOnOver Desktop Launcher"
-        Width="380" Height="280"
-        MinWidth="320" MinHeight="240"
+        Width="380" Height="320"
+        MinWidth="320" MinHeight="280"
         WindowStartupLocation="CenterScreen">
 
     <Design.DataContext>
@@ -40,6 +40,16 @@
                 Command="{Binding LaunchComeOnOverCommand}"
                 HorizontalAlignment="Stretch"
                 HorizontalContentAlignment="Center"/>
+
+        <!-- Running instance count -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+            <TextBlock Text="{Binding RunningInstanceCount, StringFormat='Running: {0}'}"
+                       Foreground="Gray" FontSize="11"/>
+            <Button Content="↻"
+                    Command="{Binding RefreshInstanceCountCommand}"
+                    Padding="4,0"
+                    FontSize="11"/>
+        </StackPanel>
 
         <TextBlock Text="{Binding StatusMessage}"
                    Foreground="Gray"

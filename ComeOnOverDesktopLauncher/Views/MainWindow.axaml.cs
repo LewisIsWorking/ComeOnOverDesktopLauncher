@@ -8,4 +8,12 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
     }
+
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        // Hide to tray instead of closing — use the tray icon Quit to fully exit
+        e.Cancel = true;
+        Hide();
+        base.OnClosing(e);
+    }
 }

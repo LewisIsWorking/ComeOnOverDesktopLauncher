@@ -19,6 +19,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private int _slotCount;
     [ObservableProperty] private string _statusMessage = "Ready";
     [ObservableProperty] private bool _isClaudeInstalled;
+    [ObservableProperty] private int _runningInstanceCount;
 
     public MainWindowViewModel(
         IClaudeInstanceLauncher launcher,
@@ -35,6 +36,7 @@ public partial class MainWindowViewModel : ObservableObject
         var settings = _settingsService.Load();
         _slotCount = settings.DefaultSlotCount;
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
+        _runningInstanceCount = _launcher.GetRunningInstanceCount();
     }
 
     [RelayCommand]
@@ -46,7 +48,8 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (var slot in slots)
                 _launcher.LaunchSlot(slot);
 
-            StatusMessage = $"Launched {SlotCount} Claude instance(s).";
+            RunningInstanceCount = _launcher.GetRunningInstanceCount();
+            StatusMessage = $"Launched {SlotCount} instance(s). {RunningInstanceCount} running.";
             SaveSettings();
         }
         catch (Exception ex)
@@ -60,6 +63,12 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _cooService.Launch();
         StatusMessage = "ComeOnOver opened.";
+    }
+
+    [RelayCommand]
+    private void RefreshInstanceCount()
+    {
+        RunningInstanceCount = _launcher.GetRunningInstanceCount();
     }
 
     [RelayCommand]
