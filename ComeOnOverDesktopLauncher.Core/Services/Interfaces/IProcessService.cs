@@ -1,3 +1,5 @@
+using ComeOnOverDesktopLauncher.Core.Models;
+
 namespace ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 
 /// <summary>
@@ -13,4 +15,10 @@ public interface IProcessService
     /// Use this for Electron apps that spawn many background child processes.
     /// </summary>
     int CountByNameWithWindow(string processName);
+
+    /// <summary>
+    /// Returns raw snapshots for all windowed processes with the given name.
+    /// Used by ResourceMonitor to compute CPU and RAM usage.
+    /// </summary>
+    IReadOnlyList<ProcessSnapshot> GetWindowedProcessSnapshots(string processName);
 }

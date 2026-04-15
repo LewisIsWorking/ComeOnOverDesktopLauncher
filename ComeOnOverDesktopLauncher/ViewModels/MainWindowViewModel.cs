@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ComeOnOverDesktopLauncher.Core.Models;
@@ -7,7 +9,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Drives the main launcher window.
-/// Handles launching Claude instances and the ComeOnOver app.
+/// Handles launching Claude instances, resource monitoring, and the ComeOnOver app.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -15,28 +17,44 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ISlotManager _slotManager;
     private readonly IComeOnOverAppService _cooService;
     private readonly ISettingsService _settingsService;
+    private readonly IResourceMonitor _resourceMonitor;
+    private readonly DispatcherTimer _refreshTimer;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRunningInstances))]
+    private int _runningInstanceCount;
 
     [ObservableProperty] private int _slotCount;
     [ObservableProperty] private string _statusMessage = "Ready";
     [ObservableProperty] private bool _isClaudeInstalled;
-    [ObservableProperty] private int _runningInstanceCount;
+    [ObservableProperty] private double _totalRamMb;
+    [ObservableProperty] private double _totalCpuPercent;
+
+    public bool HasRunningInstances => RunningInstanceCount > 0;
+    public ObservableCollection<ClaudeInstanceViewModel> Instances { get; } = new();
 
     public MainWindowViewModel(
         IClaudeInstanceLauncher launcher,
         ISlotManager slotManager,
         IComeOnOverAppService cooService,
         ISettingsService settingsService,
-        IClaudePathResolver pathResolver)
+        IClaudePathResolver pathResolver,
+        IResourceMonitor resourceMonitor)
     {
         _launcher = launcher;
         _slotManager = slotManager;
         _cooService = cooService;
         _settingsService = settingsService;
+        _resourceMonitor = resourceMonitor;
 
         var settings = _settingsService.Load();
         _slotCount = settings.DefaultSlotCount;
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
+
+        _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _refreshTimer.Tick += (_, _) => RefreshResources();
+        _refreshTimer.Start();
     }
 
     [RelayCommand]
@@ -66,14 +84,32 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RefreshInstanceCount()
+    private void RefreshResources()
     {
         RunningInstanceCount = _launcher.GetRunningInstanceCount();
+        var snapshots = _resourceMonitor.GetSnapshots();
+        TotalRamMb = _resourceMonitor.TotalRamMb;
+        TotalCpuPercent = _resourceMonitor.TotalCpuPercent;
+        SyncInstanceCollection(snapshots);
     }
 
     [RelayCommand]
     private void SaveSettings()
     {
         _settingsService.Save(new AppSettings { DefaultSlotCount = SlotCount });
+    }
+
+    private void SyncInstanceCollection(IReadOnlyList<InstanceResourceSnapshot> snapshots)
+    {
+        while (Instances.Count > snapshots.Count)
+            Instances.RemoveAt(Instances.Count - 1);
+
+        for (var i = 0; i < snapshots.Count; i++)
+        {
+            if (i >= Instances.Count)
+                Instances.Add(new ClaudeInstanceViewModel(snapshots[i].InstanceNumber));
+
+            Instances[i].UpdateFrom(snapshots[i]);
+        }
     }
 }
