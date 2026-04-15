@@ -22,6 +22,9 @@ public partial class App : Application
     {
         _serviceProvider = ConfigureServices().BuildServiceProvider();
 
+        // Refresh Claude path on every launch to handle Claude updates silently
+        _serviceProvider.GetRequiredService<IClaudePathCache>().Refresh();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow
@@ -40,6 +43,7 @@ public partial class App : Application
         services.AddSingleton<IFileSystem, WindowsFileSystem>();
         services.AddSingleton<IProcessService, SystemProcessService>();
         services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
+        services.AddSingleton<IClaudePathCache, ClaudePathCache>();
         services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
         services.AddSingleton<ISlotManager, SlotManager>();
         services.AddSingleton<ISettingsService, SettingsService>();

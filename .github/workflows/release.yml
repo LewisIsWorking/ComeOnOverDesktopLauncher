@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run tests
+        run: dotnet test ComeOnOverDesktopLauncher.Tests/ComeOnOverDesktopLauncher.Tests.csproj --configuration Release
+
+      - name: Publish self-contained Windows exe
+        run: |
+          dotnet publish ComeOnOverDesktopLauncher/ComeOnOverDesktopLauncher.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --output publish `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true
+
+      - name: Create release archive
+        run: Compress-Archive -Path publish\* -DestinationPath ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ComeOnOver Desktop Launcher ${{ github.ref_name }}
+          body: |
+            ## What's New
+            See [ROADMAP.md](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/blob/master/ROADMAP.md) for details.
+
+            ## Download
+            Download `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip`, extract it, and run `ComeOnOverDesktopLauncher.exe`.
+
+            No .NET installation required — this is a self-contained executable.
+          files: ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
+          draft: false
+          prerelease: false

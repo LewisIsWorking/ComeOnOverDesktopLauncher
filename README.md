@@ -1,6 +1,6 @@
 # ComeOnOver Desktop Launcher
 
-A launcher utility for the [ComeOnOver](https://comeonover.app) ecosystem.
+A launcher utility for the [ComeOnOver](https://comeonover.netlify.app) ecosystem.
 
 ## Features
 
@@ -38,6 +38,4 @@ ComeOnOverDesktopLauncher.Tests/    # xUnit test suite (100% coverage)
 
 ## Roadmap
 
-- System tray icon for always-on access
-- macOS and Linux support
-- Native ComeOnOver desktop app integration
+See [ROADMAP.md](ROADMAP.md) for planned features and release milestones.
