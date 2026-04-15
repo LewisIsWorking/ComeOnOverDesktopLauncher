@@ -1,16 +1,18 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
-using Avalonia.Data.Core.Plugins;
-using System.Linq;
 using Avalonia.Markup.Xaml;
+using ComeOnOverDesktopLauncher.Core.Services;
+using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.ViewModels;
 using ComeOnOverDesktopLauncher.Views;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ComeOnOverDesktopLauncher;
 
 public partial class App : Application
 {
+    private ServiceProvider? _serviceProvider;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -18,14 +20,33 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        _serviceProvider = ConfigureServices().BuildServiceProvider();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(),
+                DataContext = _serviceProvider.GetRequiredService<MainWindowViewModel>()
             };
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private static ServiceCollection ConfigureServices()
+    {
+        var services = new ServiceCollection();
+
+        services.AddSingleton<IFileSystem, WindowsFileSystem>();
+        services.AddSingleton<IProcessService, SystemProcessService>();
+        services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
+        services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
+        services.AddSingleton<ISlotManager, SlotManager>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+        services.AddSingleton(provider => provider.GetRequiredService<ISettingsService>().Load());
+        services.AddSingleton<IComeOnOverAppService, ComeOnOverAppService>();
+        services.AddTransient<MainWindowViewModel>();
+
+        return services;
     }
 }
