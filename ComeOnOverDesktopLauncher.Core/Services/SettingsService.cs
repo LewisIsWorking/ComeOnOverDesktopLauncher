@@ -28,8 +28,15 @@ public class SettingsService : ISettingsService
         if (!_fileSystem.FileExists(_settingsPath))
             return new AppSettings();
 
-        var json = _fileSystem.ReadAllText(_settingsPath);
-        return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+        try
+        {
+            var json = _fileSystem.ReadAllText(_settingsPath);
+            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+        }
+        catch (JsonException)
+        {
+            return new AppSettings();
+        }
     }
 
     public void Save(AppSettings settings)
