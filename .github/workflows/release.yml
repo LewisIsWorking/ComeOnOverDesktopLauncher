@@ -19,7 +19,14 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '9.0.x'
+
+      - name: Update target framework for CI
+        run: |
+          Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
+            (Get-Content $_.FullName) -replace '<TargetFramework>net10.0</TargetFramework>', '<TargetFramework>net9.0</TargetFramework>' |
+            Set-Content $_.FullName
+          }
 
       - name: Run tests
         run: dotnet test ComeOnOverDesktopLauncher.Tests/ComeOnOverDesktopLauncher.Tests.csproj --configuration Release
@@ -42,13 +49,13 @@ jobs:
         with:
           name: ComeOnOver Desktop Launcher ${{ github.ref_name }}
           body: |
-            ## What's New
-            See [ROADMAP.md](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/blob/master/ROADMAP.md) for details.
-
             ## Download
             Download `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip`, extract it, and run `ComeOnOverDesktopLauncher.exe`.
 
             No .NET installation required — this is a self-contained executable.
+
+            ## What's New
+            See [ROADMAP.md](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/blob/master/ROADMAP.md) for details.
           files: ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
           draft: false
           prerelease: false
