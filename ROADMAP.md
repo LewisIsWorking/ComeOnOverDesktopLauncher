@@ -7,13 +7,15 @@
 - [x] Settings persist between sessions (slot count)
 - [x] Claude install auto-detection (MSIX/WindowsApps + PowerShell fallback)
 - [x] Resizable window with sensible minimum size
+- [x] Auto-update path cache on every launch (handles Claude updates silently)
+- [x] GitHub Actions release pipeline — self-contained .exe, no .NET required
 
 ## v1.1 — Polish
 - [ ] System tray icon — minimize to tray, right-click quick-launch menu
-- [ ] Auto-update: on launch, re-detect Claude install path in case of updates
 - [ ] Show currently running Claude instance count
 - [ ] Per-slot status indicators (running / not running)
 - [ ] Better error messaging when Claude is not found
+- [ ] Bare .exe download alongside zip in releases
 
 ## v1.2 — ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)
@@ -26,8 +28,12 @@
 - [ ] Platform-specific path resolver implementations behind IClaudePathResolver
 - [ ] CI/CD pipeline for multi-platform builds
 
+## Monetisation
+- [ ] In-app advertising (tasteful, non-intrusive — planned for a future version)
+- [ ] GitHub Sponsors / Ko-fi as an alternative for users who prefer ad-free
+- [ ] Ads will never appear in v1.x — planned for a later major version once the user base is established
+
 ## Backlog / Under Consideration
-- [ ] Monetisation strategy (GitHub Sponsors / Ko-fi — no ads in-app)
 - [ ] Auto-update mechanism for the launcher itself (Squirrel.Windows / Sparkle)
 - [ ] Submit to awesome-avalonia list
 - [ ] Reddit / HN launch post
