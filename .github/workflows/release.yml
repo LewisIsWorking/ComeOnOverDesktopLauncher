@@ -41,6 +41,9 @@ jobs:
             -p:PublishSingleFile=true `
             -p:IncludeNativeLibrariesForSelfExtract=true
 
+      - name: Copy bare exe
+        run: Copy-Item publish\ComeOnOverDesktopLauncher.exe ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.exe
+
       - name: Create release archive
         run: Compress-Archive -Path publish\* -DestinationPath ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
 
@@ -50,12 +53,17 @@ jobs:
           name: ComeOnOver Desktop Launcher ${{ github.ref_name }}
           body: |
             ## Download
-            Download `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip`, extract it, and run `ComeOnOverDesktopLauncher.exe`.
+            | File | Description |
+            |------|-------------|
+            | `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.exe` | Single executable — just download and run |
+            | `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip` | Zip archive containing the same executable |
 
             No .NET installation required — this is a self-contained executable.
 
             ## What's New
             See [ROADMAP.md](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/blob/master/ROADMAP.md) for details.
-          files: ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
+          files: |
+            ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.exe
+            ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
           draft: false
           prerelease: false
