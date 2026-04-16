@@ -51,7 +51,7 @@
                     <NumericUpDown Value="{Binding RefreshIntervalSeconds}"
                                    Minimum="1" Maximum="60"
                                    FormatString="0"
-                                   Width="72"/>
+                                   Width="90" MinWidth="90" VerticalAlignment="Center"/>
                     <TextBlock Text="s" FontSize="12" VerticalAlignment="Center"/>
                 </StackPanel>
             </StackPanel>
@@ -104,7 +104,7 @@
 
                                 <!-- Name + login status -->
                                 <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding LoginStatusIndicator}"
+                                    <TextBlock Text="{Binding LoginStatusText}"
                                                FontSize="10" VerticalAlignment="Center"
                                                ToolTip.Tip="{Binding LoginStatusTooltip}"/>
                                     <TextBox Text="{Binding SlotName}"
@@ -158,4 +158,6 @@
         </StackPanel>
     </ScrollViewer>
 </Window>
+
+
 
