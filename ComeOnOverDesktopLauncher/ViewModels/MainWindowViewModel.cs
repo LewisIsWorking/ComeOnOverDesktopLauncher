@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Reflection;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -9,7 +10,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Drives the main launcher window.
-/// Handles launching Claude instances, resource monitoring, and the ComeOnOver app.
+/// Handles launching Claude instances, resource monitoring, startup toggle, and ComeOnOver.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -19,6 +20,8 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IComeOnOverAppService _cooService;
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
+    private readonly IStartupService _startupService;
+    private readonly IVersionProvider _versionProvider;
     private readonly DispatcherTimer _refreshTimer;
     private AppSettings _settings;
 
@@ -31,6 +34,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _isClaudeInstalled;
     [ObservableProperty] private double _totalRamMb;
     [ObservableProperty] private double _totalCpuPercent;
+    [ObservableProperty] private bool _launchOnStartup;
 
     public string AppVersion { get; }
     public bool HasRunningInstances => RunningInstanceCount > 0;
@@ -44,6 +48,7 @@ public partial class MainWindowViewModel : ObservableObject
         ISettingsService settingsService,
         IClaudePathResolver pathResolver,
         IResourceMonitor resourceMonitor,
+        IStartupService startupService,
         IVersionProvider versionProvider)
     {
         _launcher = launcher;
@@ -52,16 +57,32 @@ public partial class MainWindowViewModel : ObservableObject
         _cooService = cooService;
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
+        _startupService = startupService;
+        _versionProvider = versionProvider;
 
         AppVersion = $"v{versionProvider.GetVersion()}";
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
+        _launchOnStartup = _startupService.IsStartupEnabled();
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
         _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         _refreshTimer.Tick += (_, _) => RefreshResources();
         _refreshTimer.Start();
+    }
+
+    partial void OnLaunchOnStartupChanged(bool value)
+    {
+        if (value)
+        {
+            var exePath = Assembly.GetEntryAssembly()?.Location ?? string.Empty;
+            _startupService.EnableStartup(exePath);
+        }
+        else
+        {
+            _startupService.DisableStartup();
+        }
     }
 
     [RelayCommand]

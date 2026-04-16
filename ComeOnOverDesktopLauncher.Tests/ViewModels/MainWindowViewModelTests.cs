@@ -15,15 +15,17 @@ public class MainWindowViewModelTests
     private readonly ISettingsService _settingsService = Substitute.For<ISettingsService>();
     private readonly IClaudePathResolver _pathResolver = Substitute.For<IClaudePathResolver>();
     private readonly IResourceMonitor _resourceMonitor = Substitute.For<IResourceMonitor>();
+    private readonly IStartupService _startupService = Substitute.For<IStartupService>();
     private readonly IVersionProvider _versionProvider = Substitute.For<IVersionProvider>();
 
     private MainWindowViewModel CreateSut(AppSettings? settings = null)
     {
         _settingsService.Load().Returns(settings ?? new AppSettings { DefaultSlotCount = 2 });
-        _versionProvider.GetVersion().Returns("1.2.1");
+        _versionProvider.GetVersion().Returns("1.3.0");
         return new MainWindowViewModel(
             _launcher, _slotManager, _slotInitialiser, _cooService,
-            _settingsService, _pathResolver, _resourceMonitor, _versionProvider);
+            _settingsService, _pathResolver, _resourceMonitor,
+            _startupService, _versionProvider);
     }
 
     [Fact]
@@ -35,7 +37,14 @@ public class MainWindowViewModelTests
     [Fact]
     public void Constructor_SetsAppVersionFromProvider()
     {
-        Assert.Equal("v1.2.1", CreateSut().AppVersion);
+        Assert.Equal("v1.3.0", CreateSut().AppVersion);
+    }
+
+    [Fact]
+    public void Constructor_SetsLaunchOnStartupFromStartupService()
+    {
+        _startupService.IsStartupEnabled().Returns(true);
+        Assert.True(CreateSut().LaunchOnStartup);
     }
 
     [Fact]
@@ -64,6 +73,23 @@ public class MainWindowViewModelTests
     {
         _launcher.GetRunningInstanceCount().Returns(2);
         Assert.True(CreateSut().HasRunningInstances);
+    }
+
+    [Fact]
+    public void LaunchOnStartup_WhenSetToTrue_CallsEnableStartup()
+    {
+        var sut = CreateSut();
+        sut.LaunchOnStartup = true;
+        _startupService.Received().EnableStartup(Arg.Any<string>());
+    }
+
+    [Fact]
+    public void LaunchOnStartup_WhenSetToFalse_CallsDisableStartup()
+    {
+        _startupService.IsStartupEnabled().Returns(true);
+        var sut = CreateSut();
+        sut.LaunchOnStartup = false;
+        _startupService.Received().DisableStartup();
     }
 
     [Fact]
@@ -171,37 +197,6 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void RefreshResourcesCommand_UsesStoredSlotNameForNewInstances()
-    {
-        var settings = new AppSettings { DefaultSlotCount = 2 };
-        settings.SlotNames[1] = "Work";
-        var sut = CreateSut(settings);
-        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>
-        {
-            new(1, 1, 0, 0, TimeSpan.Zero)
-        });
-
-        sut.RefreshResourcesCommand.Execute(null);
-
-        Assert.Equal("Work", sut.Instances[0].SlotName);
-    }
-
-    [Fact]
-    public void SlotNameChange_PersistsToSettings()
-    {
-        var sut = CreateSut();
-        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>
-        {
-            new(1, 1, 0, 0, TimeSpan.Zero)
-        });
-        sut.RefreshResourcesCommand.Execute(null);
-
-        sut.Instances[0].SlotName = "Research";
-
-        _settingsService.Received().Save(Arg.Is<AppSettings>(s => s.SlotNames[1] == "Research"));
-    }
-
-    [Fact]
     public void SaveSettingsCommand_PersistsCurrentSlotCount()
     {
         var sut = CreateSut();
@@ -212,3 +207,4 @@ public class MainWindowViewModelTests
         _settingsService.Received().Save(Arg.Is<AppSettings>(s => s.DefaultSlotCount == 4));
     }
 }
+

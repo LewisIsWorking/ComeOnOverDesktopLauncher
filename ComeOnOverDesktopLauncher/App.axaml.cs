@@ -30,6 +30,7 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            var startMinimised = desktop.Args?.Contains("--minimised") == true;
             var viewModel = _serviceProvider.GetRequiredService<MainWindowViewModel>();
             _mainWindow = new MainWindow { DataContext = viewModel };
 
@@ -37,6 +38,9 @@ public partial class App : Application
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
             SetupTrayIcon(viewModel, desktop);
+
+            if (!startMinimised)
+                _mainWindow.Show();
         }
 
         base.OnFrameworkInitializationCompleted();
@@ -69,6 +73,7 @@ public partial class App : Application
 
         services.AddSingleton<IFileSystem, WindowsFileSystem>();
         services.AddSingleton<IProcessService, SystemProcessService>();
+        services.AddSingleton<IRegistryService, WindowsRegistryService>();
         services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
         services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
@@ -78,6 +83,7 @@ public partial class App : Application
         services.AddSingleton(provider => provider.GetRequiredService<ISettingsService>().Load());
         services.AddSingleton<IComeOnOverAppService, ComeOnOverAppService>();
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();
+        services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IVersionProvider, VersionProvider>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddTransient<MainWindowViewModel>();

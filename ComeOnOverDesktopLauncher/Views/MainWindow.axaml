@@ -37,6 +37,13 @@
                        IsVisible="{Binding !IsClaudeInstalled}"
                        Foreground="OrangeRed" FontSize="13"/>
 
+            <!-- Settings row -->
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <CheckBox Content="Launch on startup"
+                          IsChecked="{Binding LaunchOnStartup}"
+                          FontSize="12"/>
+            </StackPanel>
+
             <Button Content="Open ComeOnOver"
                     Command="{Binding LaunchComeOnOverCommand}"
                     HorizontalAlignment="Stretch"
@@ -117,4 +124,5 @@
         </StackPanel>
     </ScrollViewer>
 </Window>
+
 

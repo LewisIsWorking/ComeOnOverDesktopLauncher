@@ -28,12 +28,18 @@
 - [x] Slot names persist to settings and survive app restarts
 - [x] Fix: clicking outside slot name field correctly deselects it
 
-## v1.3 - Login Persistence
-- [ ] Investigate and fix login session not persisting between launcher launches
-- [ ] Verify --user-data-dir is correctly isolated per slot for MSIX Claude
-- [ ] Fallback: copy credentials from default Claude data dir to slot dirs on first use
+## v1.3 - Released
+- [x] Login persistence - slots seeded with cookies from default Claude profile on first use
+- [x] Version number displayed in UI, auto-updates from csproj version property
+- [x] Stale file cleanup from previous sessions
 
-## v1.4 - ComeOnOver Integration
+## v1.4 - Quality of Life
+- [ ] Launch on Windows startup option (toggle in settings)
+- [ ] Configurable refresh interval for resource monitor
+- [ ] Better error messaging when Claude is not found
+- [ ] Show slot seeding status (logged in / needs login)
+
+## v1.5 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)
 - [ ] Link to ComeOnOver download page if not installed
 - [ ] ComeOnOver version display
@@ -53,5 +59,3 @@
 - [ ] Auto-update mechanism for the launcher itself (Squirrel.Windows / Sparkle)
 - [ ] Submit to awesome-avalonia list
 - [ ] Reddit / HN launch post
-- [ ] Launch on Windows startup option
-- [ ] Configurable ComeOnOver URL (for local dev environments)
