@@ -45,14 +45,22 @@
             <StackPanel Orientation="Horizontal" Spacing="16">
                 <CheckBox Content="Launch on startup"
                           IsChecked="{Binding LaunchOnStartup}"
-                          FontSize="12"/>
+                          FontSize="12"
+                          VerticalAlignment="Center"/>
                 <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                    <TextBlock Text="Refresh:" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="Refresh interval:" FontSize="12" VerticalAlignment="Center"/>
                     <NumericUpDown Value="{Binding RefreshIntervalSeconds}"
                                    Minimum="1" Maximum="60"
                                    FormatString="0"
-                                   Width="90" MinWidth="90" VerticalAlignment="Center"/>
+                                   Width="130"
+                                   VerticalAlignment="Center"/>
                     <TextBlock Text="s" FontSize="12" VerticalAlignment="Center"/>
+                    <TextBlock Text="[i]"
+                               FontSize="11"
+                               Foreground="Gray"
+                               VerticalAlignment="Center"
+                               Cursor="Help"
+                               ToolTip.Tip="How often the CPU, RAM and uptime stats refresh for each running Claude instance. Lower = more accurate but uses slightly more CPU. Recommended: 5s"/>
                 </StackPanel>
             </StackPanel>
 
@@ -158,6 +166,7 @@
         </StackPanel>
     </ScrollViewer>
 </Window>
+
 
 
 
