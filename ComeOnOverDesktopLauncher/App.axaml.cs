@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace ComeOnOverDesktopLauncher;
 
+[SupportedOSPlatform("windows")]
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
@@ -67,6 +69,7 @@ public partial class App : Application
         _mainWindow.Activate();
     }
 
+    [SupportedOSPlatform("windows")]
     private static ServiceCollection ConfigureServices()
     {
         var services = new ServiceCollection();
@@ -91,3 +94,5 @@ public partial class App : Application
         return services;
     }
 }
+
+
