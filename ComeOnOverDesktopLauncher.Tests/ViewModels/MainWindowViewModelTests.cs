@@ -17,6 +17,7 @@ public class MainWindowViewModelTests
     private readonly IResourceMonitor _resourceMonitor = Substitute.For<IResourceMonitor>();
     private readonly IStartupService _startupService = Substitute.For<IStartupService>();
     private readonly IVersionProvider _versionProvider = Substitute.For<IVersionProvider>();
+    private readonly IUpdateChecker _updateChecker = Substitute.For<IUpdateChecker>();
 
     private MainWindowViewModel CreateSut(AppSettings? settings = null)
     {
@@ -25,7 +26,7 @@ public class MainWindowViewModelTests
         return new MainWindowViewModel(
             _launcher, _slotManager, _slotInitialiser, _cooService,
             _settingsService, _pathResolver, _resourceMonitor,
-            _startupService, _versionProvider);
+            _startupService, _updateChecker, _versionProvider);
     }
 
     [Fact]
@@ -207,4 +208,5 @@ public class MainWindowViewModelTests
         _settingsService.Received().Save(Arg.Is<AppSettings>(s => s.DefaultSlotCount == 4));
     }
 }
+
 

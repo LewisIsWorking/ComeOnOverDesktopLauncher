@@ -31,15 +31,22 @@
 ## v1.3 - Released
 - [x] Login persistence - slots seeded with cookies from default Claude profile on first use
 - [x] Version number displayed in UI, auto-updates from csproj version property
-- [x] Stale file cleanup from previous sessions
 
-## v1.4 - Quality of Life
-- [ ] Launch on Windows startup option (toggle in settings)
-- [ ] Configurable refresh interval for resource monitor
-- [ ] Better error messaging when Claude is not found
-- [ ] Show slot seeding status (logged in / needs login)
+## v1.4 - Released
+- [x] Launch on Windows startup toggle in UI
+- [x] App starts minimised to tray when launched on startup (--minimised flag)
+- [x] Login status indicator per slot: filled circle (logged in) or empty circle (not yet seeded)
+- [x] Better error messaging when Claude is not installed - includes download link hint
+- [x] Registry abstraction (IRegistryService) for future cross-platform support
+- [x] Zero build warnings - CA1416 platform annotations added throughout
+- [x] .gitattributes added to normalise line endings
 
-## v1.5 - ComeOnOver Integration
+## v1.5 - Next
+- [ ] Configurable resource monitor refresh interval (currently fixed at 5 seconds)
+- [ ] Show Claude Desktop version in UI
+- [ ] Notify user when a new launcher version is available on GitHub
+
+## v1.6 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)
 - [ ] Link to ComeOnOver download page if not installed
 - [ ] ComeOnOver version display

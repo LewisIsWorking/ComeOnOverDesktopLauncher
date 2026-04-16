@@ -8,6 +8,7 @@ public class AppSettings
     public int DefaultSlotCount { get; set; } = 3;
     public string ComeOnOverUrl { get; set; } = "https://comeonover.netlify.app";
     public bool LaunchOnStartup { get; set; } = false;
+    public int ResourceRefreshIntervalSeconds { get; set; } = 5;
 
     /// <summary>
     /// User-defined names for each slot. Key = slot number, value = display name.

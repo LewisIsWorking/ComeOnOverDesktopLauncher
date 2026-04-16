@@ -3,12 +3,11 @@
         <OutputType>WinExe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
-        <NoWarn>CA1416</NoWarn>
         <ImplicitUsings>enable</ImplicitUsings>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <Version>1.2.1</Version>
-        <AssemblyVersion>1.2.1</AssemblyVersion>
+        <Version>1.5.0</Version>
+        <AssemblyVersion>1.5.0</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>
@@ -32,4 +31,3 @@
         <ProjectReference Include="..\ComeOnOverDesktopLauncher.Core\ComeOnOverDesktopLauncher.Core.csproj" />
     </ItemGroup>
 </Project>
-

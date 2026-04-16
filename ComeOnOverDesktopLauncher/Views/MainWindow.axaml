@@ -42,11 +42,27 @@
             </StackPanel>
 
             <!-- Settings row -->
-            <StackPanel Orientation="Horizontal" Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="16">
                 <CheckBox Content="Launch on startup"
                           IsChecked="{Binding LaunchOnStartup}"
                           FontSize="12"/>
+                <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <TextBlock Text="Refresh:" FontSize="12" VerticalAlignment="Center"/>
+                    <NumericUpDown Value="{Binding RefreshIntervalSeconds}"
+                                   Minimum="1" Maximum="60"
+                                   FormatString="0"
+                                   Width="72"/>
+                    <TextBlock Text="s" FontSize="12" VerticalAlignment="Center"/>
+                </StackPanel>
             </StackPanel>
+
+            <!-- Update available banner -->
+            <Border Background="#1A4CAF25" CornerRadius="4" Padding="10,6"
+                    IsVisible="{Binding UpdateAvailableMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="{Binding UpdateAvailableMessage}"
+                           Foreground="#4CAF50" FontSize="11"
+                           TextWrapping="Wrap"/>
+            </Border>
 
             <Button Content="Open ComeOnOver"
                     Command="{Binding LaunchComeOnOverCommand}"
@@ -142,3 +158,4 @@
         </StackPanel>
     </ScrollViewer>
 </Window>
+

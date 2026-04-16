@@ -10,7 +10,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Drives the main launcher window.
-/// Handles launching Claude instances, resource monitoring, startup toggle, and ComeOnOver.
+/// Handles launching Claude instances, resource monitoring, startup toggle, update checks and ComeOnOver.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -21,6 +21,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IStartupService _startupService;
+    private readonly IUpdateChecker _updateChecker;
     private readonly IVersionProvider _versionProvider;
     private readonly DispatcherTimer _refreshTimer;
     private AppSettings _settings;
@@ -35,6 +36,8 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private double _totalRamMb;
     [ObservableProperty] private double _totalCpuPercent;
     [ObservableProperty] private bool _launchOnStartup;
+    [ObservableProperty] private int _refreshIntervalSeconds;
+    [ObservableProperty] private string? _updateAvailableMessage;
 
     public string AppVersion { get; }
     public bool HasRunningInstances => RunningInstanceCount > 0;
@@ -49,6 +52,7 @@ public partial class MainWindowViewModel : ObservableObject
         IClaudePathResolver pathResolver,
         IResourceMonitor resourceMonitor,
         IStartupService startupService,
+        IUpdateChecker updateChecker,
         IVersionProvider versionProvider)
     {
         _launcher = launcher;
@@ -58,18 +62,22 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
         _startupService = startupService;
+        _updateChecker = updateChecker;
         _versionProvider = versionProvider;
 
         AppVersion = $"v{versionProvider.GetVersion()}";
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
+        _refreshIntervalSeconds = _settings.ResourceRefreshIntervalSeconds;
         _launchOnStartup = _startupService.IsStartupEnabled();
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
-        _refreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _refreshTimer = new DispatcherTimer
+            { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };
         _refreshTimer.Tick += (_, _) => RefreshResources();
         _refreshTimer.Start();
+        _ = CheckForUpdatesAsync();
     }
 
     partial void OnLaunchOnStartupChanged(bool value)
@@ -85,6 +93,14 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    partial void OnRefreshIntervalSecondsChanged(int value)
+    {
+        if (value < 1) return;
+        _refreshTimer.Interval = TimeSpan.FromSeconds(value);
+        _settings.ResourceRefreshIntervalSeconds = value;
+        SaveSettings();
+    }
+
     [RelayCommand]
     private void LaunchInstances()
     {
@@ -96,7 +112,6 @@ public partial class MainWindowViewModel : ObservableObject
                 _slotInitialiser.EnsureInitialised(slot);
                 _launcher.LaunchSlot(slot);
             }
-
             RunningInstanceCount = _launcher.GetRunningInstanceCount();
             StatusMessage = $"Launched {SlotCount} instance(s). {RunningInstanceCount} running.";
             SaveSettings();
@@ -125,10 +140,26 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task CheckForUpdates()
+    {
+        await CheckForUpdatesAsync();
+    }
+
+    [RelayCommand]
     private void SaveSettings()
     {
         _settings.DefaultSlotCount = SlotCount;
         _settingsService.Save(_settings);
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        var latest = await _updateChecker.GetLatestVersionAsync();
+        if (latest is null) return;
+        var current = _versionProvider.GetVersion();
+        UpdateAvailableMessage = _updateChecker.IsNewerVersion(current, latest)
+            ? $"v{latest} available at github.com/LewisIsWorking/ComeOnOverDesktopLauncher"
+            : null;
     }
 
     private void OnSlotNameChanged(int slotNumber, string name)
@@ -149,14 +180,10 @@ public partial class MainWindowViewModel : ObservableObject
                 var num = snapshots[i].InstanceNumber;
                 var slot = new LaunchSlot(num);
                 Instances.Add(new ClaudeInstanceViewModel(
-                    num,
-                    _settings.GetSlotName(num),
-                    _slotInitialiser.IsSeeded(slot),
-                    OnSlotNameChanged));
+                    num, _settings.GetSlotName(num),
+                    _slotInitialiser.IsSeeded(slot), OnSlotNameChanged));
             }
-
             Instances[i].UpdateFrom(snapshots[i]);
         }
     }
 }
-
