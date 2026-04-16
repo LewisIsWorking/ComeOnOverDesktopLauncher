@@ -5,6 +5,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Wraps a single Claude instance's live resource stats and user-defined name.
+/// IsSeeded reflects whether login credentials have been copied to this slot.
 /// </summary>
 public partial class ClaudeInstanceViewModel : ObservableObject
 {
@@ -15,11 +16,22 @@ public partial class ClaudeInstanceViewModel : ObservableObject
     [ObservableProperty] private double _ramMb;
     [ObservableProperty] private string _uptimeDisplay = string.Empty;
     [ObservableProperty] private string _slotName = string.Empty;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LoginStatusIndicator))]
+    private bool _isSeeded;
 
-    public ClaudeInstanceViewModel(int instanceNumber, string initialName, Action<int, string>? onNameChanged = null)
+    public string LoginStatusIndicator => IsSeeded ? "?" : "?";
+    public string LoginStatusTooltip => IsSeeded ? "Logged in" : "Not yet logged in - will log in on first launch";
+
+    public ClaudeInstanceViewModel(
+        int instanceNumber,
+        string initialName,
+        bool isSeeded,
+        Action<int, string>? onNameChanged = null)
     {
         _instanceNumber = instanceNumber;
         _slotName = initialName;
+        _isSeeded = isSeeded;
         _onNameChanged = onNameChanged;
     }
 
@@ -35,3 +47,4 @@ public partial class ClaudeInstanceViewModel : ObservableObject
         UptimeDisplay = snapshot.UptimeDisplay;
     }
 }
+

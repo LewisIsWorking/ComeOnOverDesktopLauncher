@@ -147,11 +147,16 @@ public partial class MainWindowViewModel : ObservableObject
             if (i >= Instances.Count)
             {
                 var num = snapshots[i].InstanceNumber;
+                var slot = new LaunchSlot(num);
                 Instances.Add(new ClaudeInstanceViewModel(
-                    num, _settings.GetSlotName(num), OnSlotNameChanged));
+                    num,
+                    _settings.GetSlotName(num),
+                    _slotInitialiser.IsSeeded(slot),
+                    OnSlotNameChanged));
             }
 
             Instances[i].UpdateFrom(snapshots[i]);
         }
     }
 }
+

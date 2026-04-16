@@ -1,0 +1,10 @@
+# Normalise line endings to CRLF on Windows
+* text=auto eol=crlf
+
+# Keep binary files untouched
+*.png binary
+*.jpg binary
+*.ico binary
+*.exe binary
+*.dll binary
+*.zip binary

@@ -1,2 +1,2 @@
-// This file superseded by SlotInitialiser.cs
+// Superseded by SlotInitialiser.cs
 namespace ComeOnOverDesktopLauncher.Core.Services;

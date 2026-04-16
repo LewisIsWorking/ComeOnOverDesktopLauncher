@@ -8,25 +8,44 @@ public class ClaudeInstanceViewModelTests
     [Fact]
     public void Constructor_SetsInstanceNumber()
     {
-        var vm = new ClaudeInstanceViewModel(3, "Work");
-
-        Assert.Equal(3, vm.InstanceNumber);
+        Assert.Equal(3, new ClaudeInstanceViewModel(3, "Work", isSeeded: true).InstanceNumber);
     }
 
     [Fact]
     public void Constructor_SetsInitialName()
     {
-        var vm = new ClaudeInstanceViewModel(1, "Personal");
-
-        Assert.Equal("Personal", vm.SlotName);
+        Assert.Equal("Personal", new ClaudeInstanceViewModel(1, "Personal", isSeeded: true).SlotName);
     }
 
     [Fact]
-    public void Constructor_DefaultsToEmptyNameWhenNotProvided()
+    public void Constructor_SetsIsSeeded()
     {
-        var vm = new ClaudeInstanceViewModel(1, string.Empty);
+        Assert.True(new ClaudeInstanceViewModel(1, "Work", isSeeded: true).IsSeeded);
+        Assert.False(new ClaudeInstanceViewModel(2, "Home", isSeeded: false).IsSeeded);
+    }
 
-        Assert.Equal(string.Empty, vm.SlotName);
+    [Fact]
+    public void LoginStatusIndicator_WhenSeeded_ShowsFilledCircle()
+    {
+        Assert.Equal("?", new ClaudeInstanceViewModel(1, "Work", isSeeded: true).LoginStatusIndicator);
+    }
+
+    [Fact]
+    public void LoginStatusIndicator_WhenNotSeeded_ShowsEmptyCircle()
+    {
+        Assert.Equal("?", new ClaudeInstanceViewModel(1, "Work", isSeeded: false).LoginStatusIndicator);
+    }
+
+    [Fact]
+    public void LoginStatusTooltip_WhenSeeded_ShowsLoggedIn()
+    {
+        Assert.Contains("Logged in", new ClaudeInstanceViewModel(1, "Work", isSeeded: true).LoginStatusTooltip);
+    }
+
+    [Fact]
+    public void LoginStatusTooltip_WhenNotSeeded_ShowsNotLoggedIn()
+    {
+        Assert.Contains("Not yet", new ClaudeInstanceViewModel(1, "Work", isSeeded: false).LoginStatusTooltip);
     }
 
     [Fact]
@@ -34,7 +53,7 @@ public class ClaudeInstanceViewModelTests
     {
         int? capturedSlot = null;
         string? capturedName = null;
-        var vm = new ClaudeInstanceViewModel(2, "Old", (slot, name) =>
+        var vm = new ClaudeInstanceViewModel(2, "Old", isSeeded: false, onNameChanged: (slot, name) =>
         {
             capturedSlot = slot;
             capturedName = name;
@@ -49,25 +68,15 @@ public class ClaudeInstanceViewModelTests
     [Fact]
     public void SlotNameChange_WithNoCallback_DoesNotThrow()
     {
-        var vm = new ClaudeInstanceViewModel(1, "Test", null);
-
-        var ex = Record.Exception(() => vm.SlotName = "Changed");
-
-        Assert.Null(ex);
+        var vm = new ClaudeInstanceViewModel(1, "Test", isSeeded: false, onNameChanged: null);
+        Assert.Null(Record.Exception(() => vm.SlotName = "Changed"));
     }
 
     [Fact]
     public void UpdateFrom_UpdatesAllResourceProperties()
     {
-        var vm = new ClaudeInstanceViewModel(1, "Work");
-        var snapshot = new InstanceResourceSnapshot(
-            ProcessId: 123,
-            InstanceNumber: 1,
-            CpuPercent: 12.5,
-            RamBytes: 200 * 1024 * 1024,
-            Uptime: TimeSpan.FromMinutes(5));
-
-        vm.UpdateFrom(snapshot);
+        var vm = new ClaudeInstanceViewModel(1, "Work", isSeeded: true);
+        vm.UpdateFrom(new InstanceResourceSnapshot(123, 1, 12.5, 200 * 1024 * 1024, TimeSpan.FromMinutes(5)));
 
         Assert.Equal(12.5, vm.CpuPercent);
         Assert.Equal(200.0, vm.RamMb);
@@ -77,11 +86,8 @@ public class ClaudeInstanceViewModelTests
     [Fact]
     public void UpdateFrom_DoesNotOverwriteSlotName()
     {
-        var vm = new ClaudeInstanceViewModel(1, "Work");
-        var snapshot = new InstanceResourceSnapshot(1, 1, 5.0, 0, TimeSpan.Zero);
-
-        vm.UpdateFrom(snapshot);
-
+        var vm = new ClaudeInstanceViewModel(1, "Work", isSeeded: true);
+        vm.UpdateFrom(new InstanceResourceSnapshot(1, 1, 5.0, 0, TimeSpan.Zero));
         Assert.Equal("Work", vm.SlotName);
     }
 }
