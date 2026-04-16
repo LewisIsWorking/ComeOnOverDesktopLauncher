@@ -73,10 +73,12 @@ public partial class App : Application
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
         services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
         services.AddSingleton<ISlotManager, SlotManager>();
+        services.AddSingleton<ISlotInitialiser, SlotInitialiser>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton(provider => provider.GetRequiredService<ISettingsService>().Load());
         services.AddSingleton<IComeOnOverAppService, ComeOnOverAppService>();
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();
+        services.AddSingleton<IVersionProvider, VersionProvider>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddTransient<MainWindowViewModel>();
 

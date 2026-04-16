@@ -60,7 +60,7 @@
                         <TextBlock Text="{Binding TotalCpuPercent, StringFormat='{}{0}%'}"
                                    FontSize="16" FontWeight="SemiBold"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Content="↻"
+                    <Button Grid.Column="3" Content="&#x21BB;"
                             Command="{Binding RefreshResourcesCommand}"
                             Padding="8,4" FontSize="13"
                             VerticalAlignment="Center"/>
@@ -73,46 +73,42 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:ClaudeInstanceViewModel">
                         <Border BorderThickness="0,0,0,1" Padding="0,8">
-                            <Grid ColumnDefinitions="*,60,60,60" RowDefinitions="Auto,Auto">
-
-                                <!-- Editable slot name -->
-                                <TextBox Grid.Row="0" Grid.Column="0"
+                            <Grid ColumnDefinitions="*,60,60,60">
+                                <TextBox Grid.Column="0"
                                          Text="{Binding SlotName}"
                                          FontSize="12" FontWeight="SemiBold"
                                          BorderThickness="0"
                                          Background="Transparent"
                                          Padding="0,0,8,2"
                                          PlaceholderText="Name this slot..."/>
-
-                                <!-- CPU -->
-                                <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center">
+                                <StackPanel Grid.Column="1" HorizontalAlignment="Center">
                                     <TextBlock Text="CPU" FontSize="9" Foreground="Gray"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding CpuPercent, StringFormat='{}{0}%'}"
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
-
-                                <!-- RAM -->
-                                <StackPanel Grid.Row="0" Grid.Column="2" HorizontalAlignment="Center">
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center">
                                     <TextBlock Text="RAM" FontSize="9" Foreground="Gray"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding RamMb, StringFormat='{}{0} MB'}"
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
-
-                                <!-- Uptime -->
-                                <StackPanel Grid.Row="0" Grid.Column="3" HorizontalAlignment="Center">
+                                <StackPanel Grid.Column="3" HorizontalAlignment="Center">
                                     <TextBlock Text="Up" FontSize="9" Foreground="Gray"
                                                HorizontalAlignment="Center"/>
                                     <TextBlock Text="{Binding UptimeDisplay}"
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
-
                             </Grid>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+
+            <TextBlock Text="{Binding AppVersion}"
+                       Foreground="Gray" FontSize="10"
+                       Opacity="0.5"
+                       HorizontalAlignment="Center"/>
 
             <TextBlock Text="{Binding StatusMessage}"
                        Foreground="Gray" FontSize="11"
@@ -121,3 +117,4 @@
         </StackPanel>
     </ScrollViewer>
 </Window>
+

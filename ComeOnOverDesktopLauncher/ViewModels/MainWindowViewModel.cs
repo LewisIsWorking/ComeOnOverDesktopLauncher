@@ -15,6 +15,7 @@ public partial class MainWindowViewModel : ObservableObject
 {
     private readonly IClaudeInstanceLauncher _launcher;
     private readonly ISlotManager _slotManager;
+    private readonly ISlotInitialiser _slotInitialiser;
     private readonly IComeOnOverAppService _cooService;
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
@@ -31,23 +32,28 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private double _totalRamMb;
     [ObservableProperty] private double _totalCpuPercent;
 
+    public string AppVersion { get; }
     public bool HasRunningInstances => RunningInstanceCount > 0;
     public ObservableCollection<ClaudeInstanceViewModel> Instances { get; } = new();
 
     public MainWindowViewModel(
         IClaudeInstanceLauncher launcher,
         ISlotManager slotManager,
+        ISlotInitialiser slotInitialiser,
         IComeOnOverAppService cooService,
         ISettingsService settingsService,
         IClaudePathResolver pathResolver,
-        IResourceMonitor resourceMonitor)
+        IResourceMonitor resourceMonitor,
+        IVersionProvider versionProvider)
     {
         _launcher = launcher;
         _slotManager = slotManager;
+        _slotInitialiser = slotInitialiser;
         _cooService = cooService;
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
 
+        AppVersion = $"v{versionProvider.GetVersion()}";
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
@@ -65,7 +71,10 @@ public partial class MainWindowViewModel : ObservableObject
         {
             var slots = _slotManager.GetSlots(SlotCount);
             foreach (var slot in slots)
+            {
+                _slotInitialiser.EnsureInitialised(slot);
                 _launcher.LaunchSlot(slot);
+            }
 
             RunningInstanceCount = _launcher.GetRunningInstanceCount();
             StatusMessage = $"Launched {SlotCount} instance(s). {RunningInstanceCount} running.";
@@ -118,9 +127,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 var num = snapshots[i].InstanceNumber;
                 Instances.Add(new ClaudeInstanceViewModel(
-                    num,
-                    _settings.GetSlotName(num),
-                    OnSlotNameChanged));
+                    num, _settings.GetSlotName(num), OnSlotNameChanged));
             }
 
             Instances[i].UpdateFrom(snapshots[i]);

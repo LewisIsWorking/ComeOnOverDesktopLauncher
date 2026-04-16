@@ -10,17 +10,20 @@ public class MainWindowViewModelTests
 {
     private readonly IClaudeInstanceLauncher _launcher = Substitute.For<IClaudeInstanceLauncher>();
     private readonly ISlotManager _slotManager = Substitute.For<ISlotManager>();
+    private readonly ISlotInitialiser _slotInitialiser = Substitute.For<ISlotInitialiser>();
     private readonly IComeOnOverAppService _cooService = Substitute.For<IComeOnOverAppService>();
     private readonly ISettingsService _settingsService = Substitute.For<ISettingsService>();
     private readonly IClaudePathResolver _pathResolver = Substitute.For<IClaudePathResolver>();
     private readonly IResourceMonitor _resourceMonitor = Substitute.For<IResourceMonitor>();
+    private readonly IVersionProvider _versionProvider = Substitute.For<IVersionProvider>();
 
     private MainWindowViewModel CreateSut(AppSettings? settings = null)
     {
         _settingsService.Load().Returns(settings ?? new AppSettings { DefaultSlotCount = 2 });
+        _versionProvider.GetVersion().Returns("1.2.1");
         return new MainWindowViewModel(
-            _launcher, _slotManager, _cooService,
-            _settingsService, _pathResolver, _resourceMonitor);
+            _launcher, _slotManager, _slotInitialiser, _cooService,
+            _settingsService, _pathResolver, _resourceMonitor, _versionProvider);
     }
 
     [Fact]
@@ -30,10 +33,15 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void Constructor_SetsAppVersionFromProvider()
+    {
+        Assert.Equal("v1.2.1", CreateSut().AppVersion);
+    }
+
+    [Fact]
     public void Constructor_SetsIsClaudeInstalledFromResolver()
     {
         _pathResolver.IsClaudeInstalled().Returns(true);
-
         Assert.True(CreateSut().IsClaudeInstalled);
     }
 
@@ -41,7 +49,6 @@ public class MainWindowViewModelTests
     public void Constructor_LoadsRunningInstanceCount()
     {
         _launcher.GetRunningInstanceCount().Returns(3);
-
         Assert.Equal(3, CreateSut().RunningInstanceCount);
     }
 
@@ -49,7 +56,6 @@ public class MainWindowViewModelTests
     public void HasRunningInstances_WhenCountIsZero_ReturnsFalse()
     {
         _launcher.GetRunningInstanceCount().Returns(0);
-
         Assert.False(CreateSut().HasRunningInstances);
     }
 
@@ -57,8 +63,18 @@ public class MainWindowViewModelTests
     public void HasRunningInstances_WhenCountIsPositive_ReturnsTrue()
     {
         _launcher.GetRunningInstanceCount().Returns(2);
-
         Assert.True(CreateSut().HasRunningInstances);
+    }
+
+    [Fact]
+    public void LaunchInstancesCommand_InitialisesEachSlotBeforeLaunching()
+    {
+        _slotManager.GetSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
+        var sut = CreateSut();
+
+        sut.LaunchInstancesCommand.Execute(null);
+
+        _slotInitialiser.Received(2).EnsureInitialised(Arg.Any<LaunchSlot>());
     }
 
     [Fact]
@@ -70,6 +86,21 @@ public class MainWindowViewModelTests
         sut.LaunchInstancesCommand.Execute(null);
 
         _launcher.Received(2).LaunchSlot(Arg.Any<LaunchSlot>());
+    }
+
+    [Fact]
+    public void LaunchInstancesCommand_InitialisesBeforeLaunching()
+    {
+        var slot = new LaunchSlot(1);
+        _slotManager.GetSlots(Arg.Any<int>()).Returns([slot]);
+        var callOrder = new List<string>();
+        _slotInitialiser.When(s => s.EnsureInitialised(slot)).Do(_ => callOrder.Add("init"));
+        _launcher.When(l => l.LaunchSlot(slot)).Do(_ => callOrder.Add("launch"));
+        var sut = CreateSut();
+
+        sut.LaunchInstancesCommand.Execute(null);
+
+        Assert.Equal(["init", "launch"], callOrder);
     }
 
     [Fact]
@@ -99,7 +130,6 @@ public class MainWindowViewModelTests
     public void LaunchComeOnOverCommand_LaunchesCooService()
     {
         CreateSut().LaunchComeOnOverCommand.Execute(null);
-
         _cooService.Received(1).Launch();
     }
 
@@ -107,9 +137,7 @@ public class MainWindowViewModelTests
     public void LaunchComeOnOverCommand_UpdatesStatusMessage()
     {
         var sut = CreateSut();
-
         sut.LaunchComeOnOverCommand.Execute(null);
-
         Assert.Contains("ComeOnOver", sut.StatusMessage);
     }
 

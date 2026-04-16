@@ -10,4 +10,6 @@ public interface IFileSystem
     string ReadAllText(string path);
     void WriteAllText(string path, string content);
     void CreateDirectory(string path);
+    long GetFileSize(string path);
+    void CopyFile(string sourcePath, string destinationPath);
 }

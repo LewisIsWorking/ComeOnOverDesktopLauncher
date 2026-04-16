@@ -19,4 +19,10 @@ public class WindowsFileSystem : IFileSystem
 
     public void CreateDirectory(string path) =>
         Directory.CreateDirectory(path);
+
+    public long GetFileSize(string path) =>
+        new FileInfo(path).Length;
+
+    public void CopyFile(string sourcePath, string destinationPath) =>
+        File.Copy(sourcePath, destinationPath, overwrite: true);
 }

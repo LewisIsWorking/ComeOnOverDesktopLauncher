@@ -6,6 +6,7 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// <summary>
 /// Launches Claude Desktop instances using unique --user-data-dir per slot.
 /// Fixed slot directories ensure login sessions persist between launches.
+/// Slot initialisation (cookie seeding) is handled upstream by ISlotInitialiser.
 /// </summary>
 public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
 {
@@ -32,7 +33,7 @@ public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
 
     /// <summary>
     /// Returns the number of Claude instances with a visible window.
-    /// Uses windowed count to avoid counting Electron's many background child processes.
+    /// Uses windowed count to avoid counting Electron background child processes.
     /// </summary>
     public int GetRunningInstanceCount() =>
         _processService.CountByNameWithWindow("claude");
