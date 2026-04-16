@@ -27,13 +27,13 @@ public class ClaudeInstanceViewModelTests
     [Fact]
     public void LoginStatusText_WhenSeeded_ShowsLoggedIn()
     {
-        Assert.Equal("[in]", new ClaudeInstanceViewModel(1, "Work", isSeeded: true).LoginStatusText);
+        Assert.Equal("Logged in", new ClaudeInstanceViewModel(1, "Work", isSeeded: true).LoginStatusText);
     }
 
     [Fact]
     public void LoginStatusText_WhenNotSeeded_ShowsUnknown()
     {
-        Assert.Equal("[?]", new ClaudeInstanceViewModel(1, "Work", isSeeded: false).LoginStatusText);
+        Assert.Equal("Not logged in", new ClaudeInstanceViewModel(1, "Work", isSeeded: false).LoginStatusText);
     }
 
     [Fact]
@@ -91,6 +91,7 @@ public class ClaudeInstanceViewModelTests
         Assert.Equal("Work", vm.SlotName);
     }
 }
+
 
 
 

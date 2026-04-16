@@ -4,17 +4,18 @@ using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 namespace ComeOnOverDesktopLauncher.Core.Services;
 
 /// <summary>
-/// Seeds a Claude slot with login credentials from the default Claude profile
-/// on first use. The default Claude profile is at %APPDATA%\Claude.
-/// Slots are considered unseeded when their Cookies file is absent or minimal.
+/// Seeds a Claude slot with login credentials on first use.
+/// Primary source: the default Claude profile at %APPDATA%\Claude.
+/// Fallback: any other already-seeded slot (avoids locked-file failures when Claude is running).
 /// </summary>
 public class SlotInitialiser : ISlotInitialiser
 {
     /// <summary>
     /// A fresh Chromium cookies SQLite database is 20480 bytes.
-    /// Anything at or below this threshold means no real cookies are stored.
+    /// Anything above this threshold means real login cookies are stored.
     /// </summary>
     private const long MinimalCookiesSizeBytes = 20480;
+    private const int MaxFallbackSlots = 10;
 
     private readonly IFileSystem _fileSystem;
 
@@ -37,18 +38,33 @@ public class SlotInitialiser : ISlotInitialiser
     public void EnsureInitialised(LaunchSlot slot)
     {
         if (IsSeeded(slot)) return;
-        if (!_fileSystem.FileExists(DefaultCookiesPath)) return;
 
+        var networkDir = GetSlotNetworkDir(slot);
+        _fileSystem.CreateDirectory(networkDir);
+
+        if (TryCopyFrom(DefaultCookiesPath, GetSlotCookiesPath(slot))) return;
+
+        // Fallback: copy from any already-seeded slot (avoids locked file when Claude is open)
+        for (var i = 1; i <= MaxFallbackSlots; i++)
+        {
+            if (i == slot.SlotNumber) continue;
+            var fallbackSlot = new LaunchSlot(i);
+            if (!IsSeeded(fallbackSlot)) continue;
+            if (TryCopyFrom(GetSlotCookiesPath(fallbackSlot), GetSlotCookiesPath(slot))) return;
+        }
+    }
+
+    private bool TryCopyFrom(string sourcePath, string destinationPath)
+    {
+        if (!_fileSystem.FileExists(sourcePath)) return false;
         try
         {
-            var networkDir = GetSlotNetworkDir(slot);
-            _fileSystem.CreateDirectory(networkDir);
-            _fileSystem.CopyFile(DefaultCookiesPath, GetSlotCookiesPath(slot));
+            _fileSystem.CopyFile(sourcePath, destinationPath);
+            return true;
         }
         catch (IOException)
         {
-            // Default profile may be locked if Claude is running.
-            // Silently skip — user will need to log in once for this slot.
+            return false;
         }
     }
 

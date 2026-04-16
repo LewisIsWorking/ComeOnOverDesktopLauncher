@@ -25,7 +25,6 @@ public class SlotInitialiserTests
     public void IsSeeded_WhenCookiesFileDoesNotExist_ReturnsFalse()
     {
         _fileSystem.FileExists(SlotCookiesPath).Returns(false);
-
         Assert.False(CreateSut().IsSeeded(_slot));
     }
 
@@ -34,7 +33,6 @@ public class SlotInitialiserTests
     {
         _fileSystem.FileExists(SlotCookiesPath).Returns(true);
         _fileSystem.GetFileSize(SlotCookiesPath).Returns(20480L);
-
         Assert.False(CreateSut().IsSeeded(_slot));
     }
 
@@ -43,7 +41,6 @@ public class SlotInitialiserTests
     {
         _fileSystem.FileExists(SlotCookiesPath).Returns(true);
         _fileSystem.GetFileSize(SlotCookiesPath).Returns(36864L);
-
         Assert.True(CreateSut().IsSeeded(_slot));
     }
 
@@ -59,7 +56,7 @@ public class SlotInitialiserTests
     }
 
     [Fact]
-    public void EnsureInitialised_WhenNotSeededAndDefaultExists_CopiesCookies()
+    public void EnsureInitialised_WhenNotSeededAndDefaultExists_CopiesFromDefault()
     {
         _fileSystem.FileExists(SlotCookiesPath).Returns(false);
         _fileSystem.FileExists(DefaultCookiesPath).Returns(true);
@@ -70,10 +67,30 @@ public class SlotInitialiserTests
     }
 
     [Fact]
+    public void EnsureInitialised_WhenDefaultLockedAndFallbackSeeded_CopiesFromFallback()
+    {
+        // Slot 1 not seeded, default profile locked, but slot 2 is seeded
+        _fileSystem.FileExists(SlotCookiesPath).Returns(false);
+        _fileSystem.FileExists(DefaultCookiesPath).Returns(true);
+        _fileSystem.When(f => f.CopyFile(DefaultCookiesPath, Arg.Any<string>()))
+            .Throw(new IOException("File locked"));
+
+        var slot2CookiesPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "ClaudeSlot2", "Network", "Cookies");
+        _fileSystem.FileExists(slot2CookiesPath).Returns(true);
+        _fileSystem.GetFileSize(slot2CookiesPath).Returns(36864L);
+
+        CreateSut().EnsureInitialised(_slot);
+
+        _fileSystem.Received(1).CopyFile(slot2CookiesPath, SlotCookiesPath);
+    }
+
+    [Fact]
     public void EnsureInitialised_WhenDefaultDoesNotExist_DoesNotCopy()
     {
         _fileSystem.FileExists(SlotCookiesPath).Returns(false);
-        _fileSystem.FileExists(DefaultCookiesPath).Returns(false);
+        _fileSystem.FileExists(Arg.Any<string>()).Returns(false);
 
         CreateSut().EnsureInitialised(_slot);
 
@@ -84,12 +101,12 @@ public class SlotInitialiserTests
     public void EnsureInitialised_WhenCopyThrowsIOException_DoesNotThrow()
     {
         _fileSystem.FileExists(SlotCookiesPath).Returns(false);
-        _fileSystem.FileExists(DefaultCookiesPath).Returns(true);
-        _fileSystem.When(f => f.CopyFile(Arg.Any<string>(), Arg.Any<string>())).Throw(new IOException("File locked"));
+        _fileSystem.FileExists(Arg.Any<string>()).Returns(true);
+        _fileSystem.GetFileSize(Arg.Any<string>()).Returns(20480L);
+        _fileSystem.When(f => f.CopyFile(Arg.Any<string>(), Arg.Any<string>()))
+            .Throw(new IOException("File locked"));
 
-        var ex = Record.Exception(() => CreateSut().EnsureInitialised(_slot));
-
-        Assert.Null(ex);
+        Assert.Null(Record.Exception(() => CreateSut().EnsureInitialised(_slot)));
     }
 
     [Fact]
@@ -106,4 +123,3 @@ public class SlotInitialiserTests
         _fileSystem.Received(1).CreateDirectory(networkDir);
     }
 }
-

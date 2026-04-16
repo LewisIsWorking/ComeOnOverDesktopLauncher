@@ -18,9 +18,13 @@ public partial class ClaudeInstanceViewModel : ObservableObject
     [ObservableProperty] private string _slotName = string.Empty;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LoginStatusText))]
+    [NotifyPropertyChangedFor(nameof(LoginStatusBackground))]
+    [NotifyPropertyChangedFor(nameof(LoginStatusForeground))]
     private bool _isSeeded;
 
-    public string LoginStatusText => IsSeeded ? "[in]" : "[?]";
+    public string LoginStatusText => IsSeeded ? "Logged in" : "Not logged in";
+    public string LoginStatusBackground => IsSeeded ? "#2E7D32" : "#5D2F2F";
+    public string LoginStatusForeground => IsSeeded ? "#81C784" : "#EF9A9A";
     public string LoginStatusTooltip => IsSeeded ? "Logged in" : "Not yet logged in - will log in on first launch";
 
     public ClaudeInstanceViewModel(
@@ -47,6 +51,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject
         UptimeDisplay = snapshot.UptimeDisplay;
     }
 }
+
 
 
 
