@@ -108,7 +108,7 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate DataType="vm:ClaudeInstanceViewModel">
                         <Border BorderThickness="0,0,0,1" Padding="0,8">
-                            <Grid ColumnDefinitions="*,60,60,60">
+                            <Grid ColumnDefinitions="*,60,60,60,40">
 
                                 <!-- Name + login status -->
                                 <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -158,6 +158,20 @@
                                                FontSize="12" HorizontalAlignment="Center"/>
                                 </StackPanel>
 
+                                <!-- Kill button -->
+                                <Button Grid.Column="4"
+                                        Content="X"
+                                        Command="{Binding KillCommand}"
+                                        Foreground="#EF9A9A"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Padding="4,2"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        ToolTip.Tip="Close this Claude instance"/>
+
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -176,6 +190,7 @@
         </StackPanel>
     </ScrollViewer>
 </Window>
+
 
 
 

@@ -39,4 +39,17 @@ public class SystemProcessService : IProcessService
                 now))
             .ToList();
     }
+
+    public void KillProcess(int processId)
+    {
+        try
+        {
+            var process = Process.GetProcessById(processId);
+            process.Kill(entireProcessTree: true);
+        }
+        catch (ArgumentException)
+        {
+            // Process already exited - nothing to do
+        }
+    }
 }

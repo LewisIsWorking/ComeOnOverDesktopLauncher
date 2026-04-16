@@ -21,4 +21,9 @@ public interface IProcessService
     /// Used by ResourceMonitor to compute CPU and RAM usage.
     /// </summary>
     IReadOnlyList<ProcessSnapshot> GetWindowedProcessSnapshots(string processName);
+
+    /// <summary>
+    /// Terminates the process with the given ID, including all its child processes.
+    /// </summary>
+    void KillProcess(int processId);
 }

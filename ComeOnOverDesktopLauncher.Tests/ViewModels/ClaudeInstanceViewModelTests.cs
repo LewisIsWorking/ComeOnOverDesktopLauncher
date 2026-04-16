@@ -90,8 +90,17 @@ public class ClaudeInstanceViewModelTests
         vm.UpdateFrom(new InstanceResourceSnapshot(1, 1, 5.0, 0, TimeSpan.Zero));
         Assert.Equal("Work", vm.SlotName);
     }
+
+    [Fact]
+    public void KillCommand_InvokesOnKillCallback()
+    {
+        int? capturedPid = null;
+        var vm = new ClaudeInstanceViewModel(1, "Work", isSeeded: true, onKill: pid => capturedPid = pid);
+        var snapshot = new InstanceResourceSnapshot(9999, 1, 0, 0, TimeSpan.Zero);
+        vm.UpdateFrom(snapshot);
+
+        vm.KillCommand.Execute(null);
+
+        Assert.Equal(9999, capturedPid);
+    }
 }
-
-
-
-

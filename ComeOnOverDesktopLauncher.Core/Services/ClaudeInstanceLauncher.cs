@@ -4,9 +4,8 @@ using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 namespace ComeOnOverDesktopLauncher.Core.Services;
 
 /// <summary>
-/// Launches Claude Desktop instances using unique --user-data-dir per slot.
-/// Fixed slot directories ensure login sessions persist between launches.
-/// Slot initialisation (cookie seeding) is handled upstream by ISlotInitialiser.
+/// Launches and terminates Claude Desktop instances.
+/// Uses unique --user-data-dir per slot so login sessions persist between launches.
 /// </summary>
 public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
 {
@@ -30,6 +29,9 @@ public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
 
         _processService.Start(exePath, $"--user-data-dir=\"{dataDir}\"");
     }
+
+    public void KillInstance(int processId) =>
+        _processService.KillProcess(processId);
 
     /// <summary>
     /// Returns the number of Claude instances with a visible window.

@@ -162,6 +162,12 @@ public partial class MainWindowViewModel : ObservableObject
             : null;
     }
 
+    private void OnKillInstance(int processId)
+    {
+        _launcher.KillInstance(processId);
+        RefreshResources();
+    }
+
     private void OnSlotNameChanged(int slotNumber, string name)
     {
         _settings.SlotNames[slotNumber] = name;
@@ -180,10 +186,14 @@ public partial class MainWindowViewModel : ObservableObject
                 var num = snapshots[i].InstanceNumber;
                 var slot = new LaunchSlot(num);
                 Instances.Add(new ClaudeInstanceViewModel(
-                    num, _settings.GetSlotName(num),
-                    _slotInitialiser.IsSeeded(slot), OnSlotNameChanged));
+                    num,
+                    _settings.GetSlotName(num),
+                    _slotInitialiser.IsSeeded(slot),
+                    OnSlotNameChanged,
+                    OnKillInstance));
             }
             Instances[i].UpdateFrom(snapshots[i]);
         }
     }
 }
+

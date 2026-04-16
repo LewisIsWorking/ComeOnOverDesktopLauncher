@@ -48,4 +48,12 @@ public class ClaudeInstanceLauncherTests
 
         _processService.DidNotReceive().CountByName(Arg.Any<string>());
     }
+
+    [Fact]
+    public void KillInstance_DelegatesToProcessService()
+    {
+        CreateSut().KillInstance(1234);
+
+        _processService.Received(1).KillProcess(1234);
+    }
 }
