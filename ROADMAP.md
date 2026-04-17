@@ -41,17 +41,49 @@
 - [x] Zero build warnings - CA1416 platform annotations added throughout
 - [x] .gitattributes added to normalise line endings
 
-## v1.5 - Next
-- [ ] Configurable resource monitor refresh interval (currently fixed at 5 seconds)
-- [ ] Show Claude Desktop version in UI
-- [ ] Notify user when a new launcher version is available on GitHub
+## v1.5 - Released
+- [x] Configurable resource monitor refresh interval (1-60 seconds)
+- [x] Notify user when a new launcher version is available on GitHub
 
-## v1.6 - ComeOnOver Integration
+## v1.6 - Released
+
+![v1.6 UI](docs/screenshots/photo_2026-04-15_16-13-35.jpg)
+
+### Diagnostic logging
+- [x] File logging via `ILoggingService` / `FileLoggingService`
+- [x] Rolling daily log files at `%APPDATA%\ComeOnOverDesktopLauncher\logs\launcher-yyyy-MM-dd.log`
+- [x] Every stage of the launch flow is logged (path resolution, slot seeding, process start)
+- [x] Thread-safe logging with I/O failures swallowed - logging can never crash the app
+- [x] "Logs" button in resource-totals row opens the log folder in Explorer
+- [x] `[CallerMemberName]` auto-tags every log line with the method that emitted it
+
+### Launch semantics
+- [x] `Launch Claude` button now opens the requested number of **additional** instances
+- [x] New `ISlotManager.GetNextFreeSlots(count)` scans for the next unoccupied slot numbers
+- [x] Slot occupation detected via commandline inspection (`--user-data-dir=...\ClaudeSlotN`) not process count
+- [x] Default Claude profile no longer interferes with slot detection
+- [x] Safety cap at slot 100 so malformed state can never hang the UI
+- [x] Input label renamed from "Claude instances to open" to "Additional instances to open" for clarity
+
+### Login persistence improvements
+- [x] Cookies seeding uses `FileShare.ReadWrite` so it works while Claude is running
+- [x] Copied cookies are verified against the SQLite 3 magic header; invalid copies are discarded
+- [x] Slots opened while other Claude instances are running now inherit login correctly
+
+### UI polish
+- [x] Per-instance row layout now aligns with the combined-totals border above
+- [x] CPU / RAM / Up columns are vertically under Total RAM / Total CPU columns
+- [x] Close button column aligns with the "Logs" button column
+
+## v1.7 - Next
+- [ ] Show Claude Desktop version in UI
+
+## v2.0 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)
 - [ ] Link to ComeOnOver download page if not installed
 - [ ] ComeOnOver version display
 
-## v2.0 - Cross-Platform
+## v3.0 - Cross-Platform
 - [ ] macOS support (Claude Desktop path resolver)
 - [ ] Linux support (Claude Desktop AppImage/deb path resolver)
 - [ ] Platform-specific path resolver implementations behind IClaudePathResolver

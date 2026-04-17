@@ -9,6 +9,13 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// </summary>
 public class SlotManager : ISlotManager
 {
+    /// <summary>
+    /// Safety cap used by <see cref="GetNextFreeSlots"/> to prevent an
+    /// infinite loop if slot state is somehow malformed. 100 is well beyond
+    /// any realistic user case (UI caps at 10).
+    /// </summary>
+    private const int MaxSlotScan = 100;
+
     private readonly IProcessService _processService;
 
     public SlotManager(IProcessService processService)
@@ -34,5 +41,28 @@ public class SlotManager : ISlotManager
     {
         var runningCount = _processService.CountByNameWithWindow("claude");
         return new LaunchSlot(runningCount + 1);
+    }
+
+    public IReadOnlyList<LaunchSlot> GetNextFreeSlots(int count)
+    {
+        if (count < 1)
+            throw new ArgumentOutOfRangeException(nameof(count), "Count must be at least 1.");
+
+        var occupied = _processService.GetSlotProcesses()
+            .Select(info => info.SlotNumber)
+            .ToHashSet();
+
+        var free = new List<LaunchSlot>(count);
+        for (var n = 1; n <= MaxSlotScan && free.Count < count; n++)
+        {
+            if (!occupied.Contains(n))
+                free.Add(new LaunchSlot(n));
+        }
+
+        if (free.Count < count)
+            throw new InvalidOperationException(
+                $"Could not find {count} free slot(s) within the first {MaxSlotScan} slot numbers.");
+
+        return free;
     }
 }

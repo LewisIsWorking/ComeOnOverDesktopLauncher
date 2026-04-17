@@ -11,6 +11,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 /// <summary>
 /// Drives the main launcher window.
 /// Handles launching Claude instances, resource monitoring, startup toggle, update checks and ComeOnOver.
+/// Every launch attempt is logged via <see cref="ILoggingService"/> to aid diagnosis of silent failures.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -23,6 +24,8 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IStartupService _startupService;
     private readonly IUpdateChecker _updateChecker;
     private readonly IVersionProvider _versionProvider;
+    private readonly IProcessService _processService;
+    private readonly ILoggingService _logger;
     private readonly DispatcherTimer _refreshTimer;
     private AppSettings _settings;
 
@@ -53,7 +56,9 @@ public partial class MainWindowViewModel : ObservableObject
         IResourceMonitor resourceMonitor,
         IStartupService startupService,
         IUpdateChecker updateChecker,
-        IVersionProvider versionProvider)
+        IVersionProvider versionProvider,
+        IProcessService processService,
+        ILoggingService logger)
     {
         _launcher = launcher;
         _slotManager = slotManager;
@@ -64,6 +69,8 @@ public partial class MainWindowViewModel : ObservableObject
         _startupService = startupService;
         _updateChecker = updateChecker;
         _versionProvider = versionProvider;
+        _processService = processService;
+        _logger = logger;
 
         AppVersion = $"v{versionProvider.GetVersion()}";
         _settings = _settingsService.Load();
@@ -77,6 +84,7 @@ public partial class MainWindowViewModel : ObservableObject
             { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };
         _refreshTimer.Tick += (_, _) => RefreshResources();
         _refreshTimer.Start();
+        _logger.LogInfo($"MainWindowViewModel ready. ClaudeInstalled={_isClaudeInstalled}, SlotCount={_slotCount}");
         _ = CheckForUpdatesAsync();
     }
 
@@ -104,9 +112,12 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void LaunchInstances()
     {
+        _logger.LogInfo($"LaunchInstances command fired - SlotCount={SlotCount}");
         try
         {
-            var slots = _slotManager.GetSlots(SlotCount);
+            var slots = _slotManager.GetNextFreeSlots(SlotCount);
+            _logger.LogInfo(
+                $"Picked free slot(s): {string.Join(", ", slots.Select(s => s.SlotNumber))}");
             foreach (var slot in slots)
             {
                 _slotInitialiser.EnsureInitialised(slot);
@@ -114,10 +125,12 @@ public partial class MainWindowViewModel : ObservableObject
             }
             RunningInstanceCount = _launcher.GetRunningInstanceCount();
             StatusMessage = $"Launched {SlotCount} instance(s). {RunningInstanceCount} running.";
+            _logger.LogInfo($"LaunchInstances finished - {RunningInstanceCount} running");
             SaveSettings();
         }
         catch (Exception ex)
         {
+            _logger.LogError("LaunchInstances failed", ex);
             StatusMessage = $"Error: {ex.Message}";
         }
     }
@@ -127,6 +140,12 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _cooService.Launch();
         StatusMessage = "ComeOnOver opened.";
+    }
+
+    [RelayCommand]
+    private void OpenLogsFolder()
+    {
+        _processService.Start("explorer.exe", _logger.GetLogDirectory(), useShellExecute: false);
     }
 
     [RelayCommand]
@@ -196,4 +215,3 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 }
-

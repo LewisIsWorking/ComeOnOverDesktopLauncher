@@ -9,7 +9,8 @@ public class ClaudeInstanceLauncherTests
 {
     private readonly IClaudePathResolver _pathResolver = Substitute.For<IClaudePathResolver>();
     private readonly IProcessService _processService = Substitute.For<IProcessService>();
-    private ClaudeInstanceLauncher CreateSut() => new(_pathResolver, _processService);
+    private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
+    private ClaudeInstanceLauncher CreateSut() => new(_pathResolver, _processService, _logger);
 
     [Fact]
     public void LaunchSlot_WhenClaudeFound_StartsProcess()

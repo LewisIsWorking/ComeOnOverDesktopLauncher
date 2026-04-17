@@ -8,7 +8,8 @@ namespace ComeOnOverDesktopLauncher.Tests.Services;
 public class ClaudePathResolverTests
 {
     private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
-    private ClaudePathResolver CreateSut() => new(_fileSystem);
+    private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
+    private ClaudePathResolver CreateSut() => new(_fileSystem, _logger);
 
     [Fact]
     public void ResolveClaudeExePath_WhenExeFound_ReturnsPath()

@@ -6,6 +6,7 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// <summary>
 /// Resolves the Claude Desktop MSIX executable path on Windows.
 /// Tries direct filesystem access first, falls back to PowerShell query.
+/// Each resolution strategy is logged so failures can be diagnosed.
 /// </summary>
 public class ClaudePathResolver : IClaudePathResolver
 {
@@ -14,14 +15,34 @@ public class ClaudePathResolver : IClaudePathResolver
     private const string ClaudePackagePattern = "Claude_*";
 
     private readonly IFileSystem _fileSystem;
+    private readonly ILoggingService _logger;
 
-    public ClaudePathResolver(IFileSystem fileSystem)
+    public ClaudePathResolver(IFileSystem fileSystem, ILoggingService logger)
     {
         _fileSystem = fileSystem;
+        _logger = logger;
     }
 
-    public string? ResolveClaudeExePath() =>
-        TryResolveDirectly() ?? ResolveViaPowerShell();
+    public string? ResolveClaudeExePath()
+    {
+        _logger.LogInfo("Resolving Claude executable path");
+        var direct = TryResolveDirectly();
+        if (direct is not null)
+        {
+            _logger.LogInfo($"Resolved directly: {direct}");
+            return direct;
+        }
+
+        var viaPs = ResolveViaPowerShell();
+        if (viaPs is not null)
+        {
+            _logger.LogInfo($"Resolved via PowerShell: {viaPs}");
+            return viaPs;
+        }
+
+        _logger.LogWarning("Claude executable could not be resolved by any strategy");
+        return null;
+    }
 
     public bool IsClaudeInstalled() => ResolveClaudeExePath() is not null;
 
@@ -30,12 +51,14 @@ public class ClaudePathResolver : IClaudePathResolver
         try
         {
             var dirs = _fileSystem.GetDirectories(WindowsAppsPath, ClaudePackagePattern);
+            _logger.LogDebug($"Direct strategy found {dirs.Length} matching package directories");
             return dirs
                 .Select(dir => Path.Combine(dir, ClaudeExeRelativePath))
                 .FirstOrDefault(_fileSystem.FileExists);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
+            _logger.LogWarning($"Direct strategy denied access: {ex.Message}");
             return null;
         }
     }
@@ -52,14 +75,25 @@ public class ClaudePathResolver : IClaudePathResolver
         };
 
         using var process = Process.Start(psi);
-        if (process is null) return null;
+        if (process is null)
+        {
+            _logger.LogWarning("PowerShell strategy: Process.Start returned null");
+            return null;
+        }
 
         var output = process.StandardOutput.ReadToEnd().Trim();
         process.WaitForExit();
 
-        if (string.IsNullOrWhiteSpace(output)) return null;
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            _logger.LogWarning("PowerShell strategy: empty output from Get-AppxPackage");
+            return null;
+        }
 
         var exePath = Path.Combine(output, "app", "claude.exe");
-        return _fileSystem.FileExists(exePath) ? exePath : null;
+        var exists = _fileSystem.FileExists(exePath);
+        if (!exists)
+            _logger.LogWarning($"PowerShell strategy: package install location found but claude.exe not at {exePath}");
+        return exists ? exePath : null;
     }
 }

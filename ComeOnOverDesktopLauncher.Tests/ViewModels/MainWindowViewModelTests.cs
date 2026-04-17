@@ -18,6 +18,8 @@ public class MainWindowViewModelTests
     private readonly IStartupService _startupService = Substitute.For<IStartupService>();
     private readonly IVersionProvider _versionProvider = Substitute.For<IVersionProvider>();
     private readonly IUpdateChecker _updateChecker = Substitute.For<IUpdateChecker>();
+    private readonly IProcessService _processService = Substitute.For<IProcessService>();
+    private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
 
     private MainWindowViewModel CreateSut(AppSettings? settings = null)
     {
@@ -26,7 +28,8 @@ public class MainWindowViewModelTests
         return new MainWindowViewModel(
             _launcher, _slotManager, _slotInitialiser, _cooService,
             _settingsService, _pathResolver, _resourceMonitor,
-            _startupService, _updateChecker, _versionProvider);
+            _startupService, _updateChecker, _versionProvider,
+            _processService, _logger);
     }
 
     [Fact]
@@ -96,7 +99,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void LaunchInstancesCommand_InitialisesEachSlotBeforeLaunching()
     {
-        _slotManager.GetSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
+        _slotManager.GetNextFreeSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
         var sut = CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);
@@ -107,7 +110,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void LaunchInstancesCommand_LaunchesCorrectNumberOfSlots()
     {
-        _slotManager.GetSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
+        _slotManager.GetNextFreeSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
         var sut = CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);
@@ -119,7 +122,7 @@ public class MainWindowViewModelTests
     public void LaunchInstancesCommand_InitialisesBeforeLaunching()
     {
         var slot = new LaunchSlot(1);
-        _slotManager.GetSlots(Arg.Any<int>()).Returns([slot]);
+        _slotManager.GetNextFreeSlots(Arg.Any<int>()).Returns([slot]);
         var callOrder = new List<string>();
         _slotInitialiser.When(s => s.EnsureInitialised(slot)).Do(_ => callOrder.Add("init"));
         _launcher.When(l => l.LaunchSlot(slot)).Do(_ => callOrder.Add("launch"));
@@ -133,7 +136,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void LaunchInstancesCommand_UpdatesRunningInstanceCount()
     {
-        _slotManager.GetSlots(Arg.Any<int>()).Returns([new LaunchSlot(1)]);
+        _slotManager.GetNextFreeSlots(Arg.Any<int>()).Returns([new LaunchSlot(1)]);
         _launcher.GetRunningInstanceCount().Returns(2);
         var sut = CreateSut();
 
@@ -145,7 +148,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void LaunchInstancesCommand_WhenExceptionThrown_SetsErrorStatusMessage()
     {
-        _slotManager.GetSlots(Arg.Any<int>()).Throws(new InvalidOperationException("Test error"));
+        _slotManager.GetNextFreeSlots(Arg.Any<int>()).Throws(new InvalidOperationException("Test error"));
         var sut = CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);

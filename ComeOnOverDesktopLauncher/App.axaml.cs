@@ -76,6 +76,7 @@ public partial class App : Application
         var services = new ServiceCollection();
 
         services.AddSingleton<IFileSystem, WindowsFileSystem>();
+        services.AddSingleton<ILoggingService, FileLoggingService>();
         services.AddSingleton<IProcessService, SystemProcessService>();
         services.AddSingleton<IRegistryService, WindowsRegistryService>();
         services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
