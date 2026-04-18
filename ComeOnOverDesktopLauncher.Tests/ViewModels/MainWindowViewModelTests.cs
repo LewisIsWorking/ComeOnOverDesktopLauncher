@@ -17,7 +17,8 @@ public class MainWindowViewModelTests
     private readonly IResourceMonitor _resourceMonitor = Substitute.For<IResourceMonitor>();
     private readonly IStartupService _startupService = Substitute.For<IStartupService>();
     private readonly IVersionProvider _versionProvider = Substitute.For<IVersionProvider>();
-    private readonly IUpdateChecker _updateChecker = Substitute.For<IUpdateChecker>();
+    private readonly IUpdateNotifier _updateNotifier = Substitute.For<IUpdateNotifier>();
+    private readonly IClaudeVersionResolver _claudeVersionResolver = Substitute.For<IClaudeVersionResolver>();
     private readonly IProcessService _processService = Substitute.For<IProcessService>();
     private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
 
@@ -28,7 +29,8 @@ public class MainWindowViewModelTests
         return new MainWindowViewModel(
             _launcher, _slotManager, _slotInitialiser, _cooService,
             _settingsService, _pathResolver, _resourceMonitor,
-            _startupService, _updateChecker, _versionProvider,
+            _startupService, _updateNotifier, _versionProvider,
+            _claudeVersionResolver,
             _processService, _logger);
     }
 
@@ -42,6 +44,27 @@ public class MainWindowViewModelTests
     public void Constructor_SetsAppVersionFromProvider()
     {
         Assert.Equal("v1.3.0", CreateSut().AppVersion);
+    }
+
+    [Fact]
+    public void Constructor_SetsClaudeVersionFromResolver()
+    {
+        _claudeVersionResolver.GetClaudeVersion().Returns("1.3109.0.0");
+        Assert.Equal("1.3109.0.0", CreateSut().ClaudeVersion);
+    }
+
+    [Fact]
+    public void Constructor_WhenClaudeVersionIsNull_FooterShowsAppVersionOnly()
+    {
+        _claudeVersionResolver.GetClaudeVersion().Returns((string?)null);
+        Assert.Equal("v1.3.0", CreateSut().FooterVersionText);
+    }
+
+    [Fact]
+    public void Constructor_WhenClaudeVersionIsKnown_FooterShowsBoth()
+    {
+        _claudeVersionResolver.GetClaudeVersion().Returns("1.3109.0.0");
+        Assert.Equal("v1.3.0 - Claude 1.3109.0.0", CreateSut().FooterVersionText);
     }
 
     [Fact]

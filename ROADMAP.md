@@ -92,8 +92,9 @@
 - [x] 162 tests passing (up from 119), zero warnings, zero errors
 
 ## v1.8 - Next
-- [ ] Show Claude Desktop version in UI
-- [ ] Split UI to distinguish launcher-managed vs externally-launched Claude instances
+- [x] **Show Claude Desktop version in UI** - read `FileVersionInfo.ProductVersion` from the resolved claude.exe and display it in the footer alongside the launcher version (e.g. `Launcher v1.7.1 - Claude 1.3109.0.0`). New `IClaudeVersionResolver` service + property on `MainWindowViewModel` + text in the footer region of `MainWindow.axaml`.
+- [ ] **Split UI for launcher-managed vs externally-launched Claude instances** - detect claude.exe processes with no `--user-data-dir=ClaudeSlot...` pattern and surface them as a separate row. Needs a design pass first: is `external` meant as (a) default-profile Claude from Start menu/taskbar, (b) slot-profile Claude launched before the launcher started, or (c) both? Kill semantics also need nailing down (we should not kill a process we did not start without clearer consent).
+- [ ] **`Copy window screenshot to clipboard` button** - tiny UX helper that grabs the current launcher window (via `GetWindowRect` + GDI `CopyFromScreen`) and pushes it to the clipboard. Saves the maximised-window-capture dance that has taken ~30 minutes every release. Low priority.
 
 ## v2.0 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)

@@ -30,6 +30,14 @@ public interface IFileSystem
     void DeleteFile(string path);
 
     /// <summary>
+    /// Reads the ProductVersion from a Windows PE file (exe/dll) via
+    /// FileVersionInfo. Returns null if the file does not exist, has no
+    /// version resource, or cannot be opened. Never throws for these
+    /// expected cases.
+    /// </summary>
+    string? GetFileProductVersion(string path);
+
+    /// <summary>
     /// Reads the first <paramref name="byteCount"/> bytes of a file.
     /// Returns fewer bytes if the file is shorter; returns an empty array if the
     /// file does not exist. Used to inspect file magic numbers (SQLite header etc.).

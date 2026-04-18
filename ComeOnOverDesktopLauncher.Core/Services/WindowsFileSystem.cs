@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 
 namespace ComeOnOverDesktopLauncher.Core.Services;
@@ -43,6 +44,18 @@ public class WindowsFileSystem : IFileSystem
     public void DeleteFile(string path)
     {
         if (File.Exists(path)) File.Delete(path);
+    }
+
+    public string? GetFileProductVersion(string path)
+    {
+        if (!File.Exists(path)) return null;
+        try
+        {
+            return FileVersionInfo.GetVersionInfo(path).ProductVersion;
+        }
+        catch (FileNotFoundException) { return null; }
+        catch (IOException) { return null; }
+        catch (UnauthorizedAccessException) { return null; }
     }
 
     public byte[] ReadFileHeader(string path, int byteCount)

@@ -90,6 +90,7 @@ public partial class App : Application
         services.AddSingleton<IRegistryService, WindowsRegistryService>();
         services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
+        services.AddSingleton<IClaudeVersionResolver, ClaudeVersionResolver>();
         services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
         services.AddSingleton<ISlotManager, SlotManager>();
         services.AddSingleton<ISlotSeedCache, FileSlotSeedCache>();
@@ -104,6 +105,7 @@ public partial class App : Application
         services.AddSingleton<IVersionProvider, VersionProvider>();
         services.AddSingleton<HttpClient>();
         services.AddSingleton<IUpdateChecker, GitHubUpdateChecker>();
+        services.AddSingleton<IUpdateNotifier, UpdateNotifier>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddTransient<MainWindowViewModel>();
 

@@ -22,8 +22,9 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IStartupService _startupService;
-    private readonly IUpdateChecker _updateChecker;
+    private readonly IUpdateNotifier _updateNotifier;
     private readonly IVersionProvider _versionProvider;
+    private readonly IClaudeVersionResolver _claudeVersionResolver;
     private readonly IProcessService _processService;
     private readonly ILoggingService _logger;
     private readonly DispatcherTimer _refreshTimer;
@@ -43,6 +44,9 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private string? _updateAvailableMessage;
 
     public string AppVersion { get; }
+    public string? ClaudeVersion { get; }
+    public string FooterVersionText =>
+        ClaudeVersion is null ? AppVersion : $"{AppVersion} - Claude {ClaudeVersion}";
     public bool HasRunningInstances => RunningInstanceCount > 0;
     public ObservableCollection<ClaudeInstanceViewModel> Instances { get; } = new();
 
@@ -55,8 +59,9 @@ public partial class MainWindowViewModel : ObservableObject
         IClaudePathResolver pathResolver,
         IResourceMonitor resourceMonitor,
         IStartupService startupService,
-        IUpdateChecker updateChecker,
+        IUpdateNotifier updateNotifier,
         IVersionProvider versionProvider,
+        IClaudeVersionResolver claudeVersionResolver,
         IProcessService processService,
         ILoggingService logger)
     {
@@ -67,12 +72,14 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
         _startupService = startupService;
-        _updateChecker = updateChecker;
+        _updateNotifier = updateNotifier;
         _versionProvider = versionProvider;
+        _claudeVersionResolver = claudeVersionResolver;
         _processService = processService;
         _logger = logger;
 
         AppVersion = $"v{versionProvider.GetVersion()}";
+        ClaudeVersion = _claudeVersionResolver.GetClaudeVersion();
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
         _refreshIntervalSeconds = _settings.ResourceRefreshIntervalSeconds;
@@ -171,15 +178,8 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsService.Save(_settings);
     }
 
-    private async Task CheckForUpdatesAsync()
-    {
-        var latest = await _updateChecker.GetLatestVersionAsync();
-        if (latest is null) return;
-        var current = _versionProvider.GetVersion();
-        UpdateAvailableMessage = _updateChecker.IsNewerVersion(current, latest)
-            ? $"v{latest} available at github.com/LewisIsWorking/ComeOnOverDesktopLauncher"
-            : null;
-    }
+    private async Task CheckForUpdatesAsync() =>
+        UpdateAvailableMessage = await _updateNotifier.GetUpdateAvailableMessageAsync();
 
     private void OnKillInstance(int processId)
     {

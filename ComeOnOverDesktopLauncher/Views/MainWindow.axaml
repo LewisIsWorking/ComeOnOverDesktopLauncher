@@ -187,7 +187,7 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock Text="{Binding AppVersion}"
+            <TextBlock Text="{Binding FooterVersionText}"
                        Foreground="Gray" FontSize="10"
                        Opacity="0.5"
                        HorizontalAlignment="Center"/>
