@@ -21,13 +21,20 @@ public class SlotProcessMonitorTests
     [Fact]
     public void Start_BeginsPolling()
     {
+        // Use a polling wait rather than a fixed Thread.Sleep. CI runners
+        // can take several hundred milliseconds to deliver the first timer
+        // tick under cold-start conditions; a short fixed sleep is flaky.
         _processService.GetSlotProcesses().Returns(Array.Empty<SlotProcessInfo>());
         using var sut = CreateSut();
 
         sut.Start(TimeSpan.FromMilliseconds(50));
 
-        // Wait long enough for at least one tick to happen
-        Thread.Sleep(200);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline &&
+               _processService.ReceivedCalls().All(c => c.GetMethodInfo().Name != nameof(IProcessService.GetSlotProcesses)))
+        {
+            Thread.Sleep(50);
+        }
         sut.Stop();
 
         _processService.ReceivedWithAnyArgs().GetSlotProcesses();
@@ -59,13 +66,23 @@ public class SlotProcessMonitorTests
     [Fact]
     public void Start_CalledTwice_ReplacesPreviousTimer()
     {
+        // If the second Start did not replace the first, GetSlotProcesses
+        // would not be called within the polling window (the original 10s
+        // timer would still be pending). We poll up to 10 seconds for a tick
+        // from the replacement 50ms timer to keep the test fast but robust
+        // against slow CI runners.
         using var sut = CreateSut();
         _processService.GetSlotProcesses().Returns(Array.Empty<SlotProcessInfo>());
 
-        sut.Start(TimeSpan.FromSeconds(10)); // long interval - would rarely tick
-        sut.Start(TimeSpan.FromMilliseconds(50)); // short interval - ticks quickly
+        sut.Start(TimeSpan.FromSeconds(10));        // long interval
+        sut.Start(TimeSpan.FromMilliseconds(50));   // replacement interval
 
-        Thread.Sleep(200);
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline &&
+               _processService.ReceivedCalls().All(c => c.GetMethodInfo().Name != nameof(IProcessService.GetSlotProcesses)))
+        {
+            Thread.Sleep(50);
+        }
         sut.Stop();
 
         _processService.ReceivedWithAnyArgs().GetSlotProcesses();
@@ -74,6 +91,9 @@ public class SlotProcessMonitorTests
     [Fact]
     public void SlotClosedEvent_RaisedForClosedSlots()
     {
+        // On CI runners the first tick can take significantly longer than
+        // 150 ms, so wait actively for the runner to observe "slot 1
+        // running" before swapping in the "slot 1 gone" stub.
         using var sut = CreateSut();
         LaunchSlot? closedSlot = null;
         var eventRaised = new ManualResetEventSlim(false);
@@ -88,13 +108,20 @@ public class SlotProcessMonitorTests
         _processService.GetSlotProcesses().Returns(new[] { new SlotProcessInfo(100, 1) });
         sut.Start(TimeSpan.FromMilliseconds(50));
 
-        // Wait for at least one tick to seed the runner
-        Thread.Sleep(150);
+        // Wait up to 10 seconds for the runner to observe at least one tick
+        // so that slot 1 becomes a known slot (otherwise there's nothing to
+        // "close").
+        var seedDeadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < seedDeadline &&
+               _processService.ReceivedCalls().All(c => c.GetMethodInfo().Name != nameof(IProcessService.GetSlotProcesses)))
+        {
+            Thread.Sleep(50);
+        }
 
         // Second tick onwards: slot 1 is gone
         _processService.GetSlotProcesses().Returns(Array.Empty<SlotProcessInfo>());
 
-        var raised = eventRaised.Wait(TimeSpan.FromSeconds(2));
+        var raised = eventRaised.Wait(TimeSpan.FromSeconds(10));
         sut.Stop();
 
         Assert.True(raised, "SlotClosed event should have been raised");
@@ -115,7 +142,15 @@ public class SlotProcessMonitorTests
         });
 
         sut.Start(TimeSpan.FromMilliseconds(50));
-        Thread.Sleep(250); // give time for multiple ticks
+
+        // Poll for at least 2 calls (i.e. timer kept running after the
+        // exception) rather than relying on a fixed sleep that can lose
+        // to slow CI runners.
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline && callCount < 2)
+        {
+            Thread.Sleep(50);
+        }
         sut.Stop();
 
         _logger.Received().LogError(

@@ -52,10 +52,14 @@ public class SlotInitialiserTests
     }
 
     [Fact]
-    public void EnsureInitialised_WhenAlreadySeeded_DoesNotCopy()
+    public void EnsureInitialised_WhenAlreadySeededAndCacheUnavailable_DoesNotCopy()
     {
+        // When the cache is empty and the slot has existing cookies, we
+        // should neither consult the legacy copy paths nor overwrite the
+        // slot's existing state.
         _fileSystem.FileExists(SlotCookiesPath).Returns(true);
         _fileSystem.GetFileSize(SlotCookiesPath).Returns(36864L);
+        _seedCache.TrySeed(_slot).Returns(false);
 
         CreateSut().EnsureInitialised(_slot);
 
@@ -196,13 +200,20 @@ public class SlotInitialiserTests
     }
 
     [Fact]
-    public void EnsureInitialised_WhenAlreadySeeded_DoesNotConsultSeedCache()
+    public void EnsureInitialised_WhenAlreadySeededButCachePopulated_ReSeedsFromCache()
     {
+        // Even when the slot already has a populated cookies file, re-seed
+        // from the cache so any stale/mismatched Cookies-vs-LocalState pair
+        // is corrected before launch. This prevents the surprise login wall
+        // seen in v1.7.0 when a slot's data dir had cookies from one session
+        // and Local State from another.
         _fileSystem.FileExists(SlotCookiesPath).Returns(true);
         _fileSystem.GetFileSize(SlotCookiesPath).Returns(36864L);
+        _seedCache.TrySeed(_slot).Returns(true);
 
         CreateSut().EnsureInitialised(_slot);
 
-        _seedCache.DidNotReceive().TrySeed(Arg.Any<LaunchSlot>());
+        _seedCache.Received(1).TrySeed(_slot);
+        _fileSystem.DidNotReceive().CopyFileSharedRead(Arg.Any<string>(), Arg.Any<string>());
     }
 }
