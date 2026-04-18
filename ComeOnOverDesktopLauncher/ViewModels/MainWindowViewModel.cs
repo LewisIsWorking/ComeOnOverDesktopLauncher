@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Reflection;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,21 +9,29 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Drives the main launcher window.
-/// Handles launching Claude instances, resource monitoring, startup toggle, update checks and ComeOnOver.
-/// Every launch attempt is logged via <see cref="ILoggingService"/> to aid diagnosis of silent failures.
+/// Handles launching Claude instances, resource monitoring, startup
+/// toggle, update checks and ComeOnOver.
+///
+/// Delegates the slot list to <see cref="SlotInstanceListViewModel"/>
+/// and the external list to <see cref="ExternalInstanceListViewModel"/>
+/// so that each windowed Claude process appears in exactly one list
+/// (launcher-managed vs externally-launched).
+///
+/// Launch sequencing (slot picking + seeding + process start) lives
+/// inside <see cref="IClaudeInstanceLauncher.LaunchInstances"/> so this
+/// VM stays focused on UI orchestration.
+///
+/// Every launch attempt is logged via <see cref="ILoggingService"/> to
+/// aid diagnosis of silent failures.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
     private readonly IClaudeInstanceLauncher _launcher;
-    private readonly ISlotManager _slotManager;
-    private readonly ISlotInitialiser _slotInitialiser;
     private readonly IComeOnOverAppService _cooService;
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IStartupService _startupService;
     private readonly IUpdateNotifier _updateNotifier;
-    private readonly IVersionProvider _versionProvider;
-    private readonly IClaudeVersionResolver _claudeVersionResolver;
     private readonly IProcessService _processService;
     private readonly ILoggingService _logger;
     private readonly DispatcherTimer _refreshTimer;
@@ -48,12 +55,11 @@ public partial class MainWindowViewModel : ObservableObject
     public string FooterVersionText =>
         ClaudeVersion is null ? AppVersion : $"{AppVersion} - Claude {ClaudeVersion}";
     public bool HasRunningInstances => RunningInstanceCount > 0;
-    public ObservableCollection<ClaudeInstanceViewModel> Instances { get; } = new();
+    public SlotInstanceListViewModel SlotInstances { get; }
+    public ExternalInstanceListViewModel ExternalInstances { get; }
 
     public MainWindowViewModel(
         IClaudeInstanceLauncher launcher,
-        ISlotManager slotManager,
-        ISlotInitialiser slotInitialiser,
         IComeOnOverAppService cooService,
         ISettingsService settingsService,
         IClaudePathResolver pathResolver,
@@ -63,23 +69,23 @@ public partial class MainWindowViewModel : ObservableObject
         IVersionProvider versionProvider,
         IClaudeVersionResolver claudeVersionResolver,
         IProcessService processService,
+        SlotInstanceListViewModel slotInstances,
+        ExternalInstanceListViewModel externalInstances,
         ILoggingService logger)
     {
         _launcher = launcher;
-        _slotManager = slotManager;
-        _slotInitialiser = slotInitialiser;
         _cooService = cooService;
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
         _startupService = startupService;
         _updateNotifier = updateNotifier;
-        _versionProvider = versionProvider;
-        _claudeVersionResolver = claudeVersionResolver;
         _processService = processService;
+        SlotInstances = slotInstances;
+        ExternalInstances = externalInstances;
         _logger = logger;
 
         AppVersion = $"v{versionProvider.GetVersion()}";
-        ClaudeVersion = _claudeVersionResolver.GetClaudeVersion();
+        ClaudeVersion = claudeVersionResolver.GetClaudeVersion();
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
         _refreshIntervalSeconds = _settings.ResourceRefreshIntervalSeconds;
@@ -87,25 +93,44 @@ public partial class MainWindowViewModel : ObservableObject
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
+        WireSlotCallbacks();
+
         _refreshTimer = new DispatcherTimer
             { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };
         _refreshTimer.Tick += (_, _) => RefreshResources();
         _refreshTimer.Start();
         _logger.LogInfo($"MainWindowViewModel ready. ClaudeInstalled={_isClaudeInstalled}, SlotCount={_slotCount}");
-        _ = CheckForUpdatesAsync();
+        _ = CheckForUpdates();
+    }
+
+    /// <summary>
+    /// Hands per-row slot callbacks to <see cref="SlotInstances"/>. The
+    /// slot VM doesn't own <c>AppSettings</c> or the launcher, so it
+    /// can't do these itself - it just forwards from the row controls.
+    /// Kept as lambdas so each callback sits next to the state it
+    /// mutates, and so the adapter layer is one method rather than four.
+    /// </summary>
+    private void WireSlotCallbacks()
+    {
+        SlotInstances.GetSlotName = num => _settings.GetSlotName(num);
+        SlotInstances.OnSlotNameChanged = (slotNumber, name) =>
+        {
+            _settings.SlotNames[slotNumber] = name;
+            SaveSettings();
+        };
+        SlotInstances.OnKillInstance = processId =>
+        {
+            _launcher.KillInstance(processId);
+            RefreshResources();
+        };
     }
 
     partial void OnLaunchOnStartupChanged(bool value)
     {
         if (value)
-        {
-            var exePath = Assembly.GetEntryAssembly()?.Location ?? string.Empty;
-            _startupService.EnableStartup(exePath);
-        }
+            _startupService.EnableStartup(Assembly.GetEntryAssembly()?.Location ?? string.Empty);
         else
-        {
             _startupService.DisableStartup();
-        }
     }
 
     partial void OnRefreshIntervalSecondsChanged(int value)
@@ -122,16 +147,9 @@ public partial class MainWindowViewModel : ObservableObject
         _logger.LogInfo($"LaunchInstances command fired - SlotCount={SlotCount}");
         try
         {
-            var slots = _slotManager.GetNextFreeSlots(SlotCount);
-            _logger.LogInfo(
-                $"Picked free slot(s): {string.Join(", ", slots.Select(s => s.SlotNumber))}");
-            foreach (var slot in slots)
-            {
-                _slotInitialiser.EnsureInitialised(slot);
-                _launcher.LaunchSlot(slot);
-            }
+            var launched = _launcher.LaunchInstances(SlotCount);
             RunningInstanceCount = _launcher.GetRunningInstanceCount();
-            StatusMessage = $"Launched {SlotCount} instance(s). {RunningInstanceCount} running.";
+            StatusMessage = $"Launched {launched.Count} instance(s). {RunningInstanceCount} running.";
             _logger.LogInfo($"LaunchInstances finished - {RunningInstanceCount} running");
             SaveSettings();
         }
@@ -162,56 +180,18 @@ public partial class MainWindowViewModel : ObservableObject
         var snapshots = _resourceMonitor.GetSnapshots();
         TotalRamMb = _resourceMonitor.TotalRamMb;
         TotalCpuPercent = _resourceMonitor.TotalCpuPercent;
-        SyncInstanceCollection(snapshots);
+        SlotInstances.Refresh(snapshots);
+        ExternalInstances.Refresh(snapshots);
     }
 
     [RelayCommand]
-    private async Task CheckForUpdates()
-    {
-        await CheckForUpdatesAsync();
-    }
+    private async Task CheckForUpdates() =>
+        UpdateAvailableMessage = await _updateNotifier.GetUpdateAvailableMessageAsync();
 
     [RelayCommand]
     private void SaveSettings()
     {
         _settings.DefaultSlotCount = SlotCount;
         _settingsService.Save(_settings);
-    }
-
-    private async Task CheckForUpdatesAsync() =>
-        UpdateAvailableMessage = await _updateNotifier.GetUpdateAvailableMessageAsync();
-
-    private void OnKillInstance(int processId)
-    {
-        _launcher.KillInstance(processId);
-        RefreshResources();
-    }
-
-    private void OnSlotNameChanged(int slotNumber, string name)
-    {
-        _settings.SlotNames[slotNumber] = name;
-        SaveSettings();
-    }
-
-    private void SyncInstanceCollection(IReadOnlyList<InstanceResourceSnapshot> snapshots)
-    {
-        while (Instances.Count > snapshots.Count)
-            Instances.RemoveAt(Instances.Count - 1);
-
-        for (var i = 0; i < snapshots.Count; i++)
-        {
-            if (i >= Instances.Count)
-            {
-                var num = snapshots[i].InstanceNumber;
-                var slot = new LaunchSlot(num);
-                Instances.Add(new ClaudeInstanceViewModel(
-                    num,
-                    _settings.GetSlotName(num),
-                    _slotInitialiser.IsSeeded(slot),
-                    OnSlotNameChanged,
-                    OnKillInstance));
-            }
-            Instances[i].UpdateFrom(snapshots[i]);
-        }
     }
 }

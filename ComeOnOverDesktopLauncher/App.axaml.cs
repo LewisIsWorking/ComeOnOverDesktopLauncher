@@ -91,6 +91,8 @@ public partial class App : Application
         services.AddSingleton<IFileSystem, WindowsFileSystem>();
         services.AddSingleton<ILoggingService, FileLoggingService>();
         services.AddSingleton<IProcessService, SystemProcessService>();
+        services.AddSingleton<IClaudeProcessScanner, WmiClaudeProcessScanner>();
+        services.AddSingleton<IClaudeProcessClassifier, RegexClaudeProcessClassifier>();
         services.AddSingleton<IRegistryService, WindowsRegistryService>();
         services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
@@ -112,6 +114,9 @@ public partial class App : Application
         services.AddSingleton<IUpdateNotifier, UpdateNotifier>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IWindowSnapshotService, WindowSnapshotService>();
+        services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();
+        services.AddTransient<SlotInstanceListViewModel>();
+        services.AddTransient<ExternalInstanceListViewModel>();
         services.AddTransient<MainWindowViewModel>();
 
         return services;

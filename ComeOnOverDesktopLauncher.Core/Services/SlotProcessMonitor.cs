@@ -15,9 +15,12 @@ public class SlotProcessMonitor : ISlotProcessMonitor, IDisposable
 
     public event EventHandler<SlotClosedEventArgs>? SlotClosed;
 
-    public SlotProcessMonitor(IProcessService processService, ILoggingService logger)
+    public SlotProcessMonitor(
+        IClaudeProcessScanner scanner,
+        IClaudeProcessClassifier classifier,
+        ILoggingService logger)
     {
-        _runner = new SlotProcessTickRunner(processService);
+        _runner = new SlotProcessTickRunner(scanner, classifier);
         _logger = logger;
     }
 

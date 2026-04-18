@@ -6,6 +6,11 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// <summary>
 /// Manages Claude Desktop instance slots.
 /// Slots are fixed and named to preserve login sessions between launches.
+///
+/// Slot occupancy (<see cref="GetNextFreeSlots"/>) is computed by scanning
+/// all running claude.exe processes via <see cref="IClaudeProcessScanner"/>,
+/// classifying each one as slot-or-external via
+/// <see cref="IClaudeProcessClassifier"/>, and collecting the slot numbers.
 /// </summary>
 public class SlotManager : ISlotManager
 {
@@ -17,10 +22,17 @@ public class SlotManager : ISlotManager
     private const int MaxSlotScan = 100;
 
     private readonly IProcessService _processService;
+    private readonly IClaudeProcessScanner _scanner;
+    private readonly IClaudeProcessClassifier _classifier;
 
-    public SlotManager(IProcessService processService)
+    public SlotManager(
+        IProcessService processService,
+        IClaudeProcessScanner scanner,
+        IClaudeProcessClassifier classifier)
     {
         _processService = processService;
+        _scanner = scanner;
+        _classifier = classifier;
     }
 
     public IReadOnlyList<LaunchSlot> GetSlots(int count)
@@ -48,8 +60,10 @@ public class SlotManager : ISlotManager
         if (count < 1)
             throw new ArgumentOutOfRangeException(nameof(count), "Count must be at least 1.");
 
-        var occupied = _processService.GetSlotProcesses()
-            .Select(info => info.SlotNumber)
+        var occupied = _scanner.Scan()
+            .Select(p => _classifier.TryClassifyAsSlot(p))
+            .Where(info => info is not null)
+            .Select(info => info!.SlotNumber)
             .ToHashSet();
 
         var free = new List<LaunchSlot>(count);

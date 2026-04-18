@@ -91,10 +91,23 @@
 - [x] `SlotSeedCacheUpdater` subscribes to `SlotClosed`, waits 5s for Electron helpers to release locks, then opportunistically refreshes the seed cache
 - [x] 162 tests passing (up from 119), zero warnings, zero errors
 
-## v1.8 - Next
+## v1.8.0 - Released
+
+![v1.8.0 UI](docs/screenshots/photo_2026-04-18_v1.8.0.png)
+
 - [x] **Show Claude Desktop version in UI** - read `FileVersionInfo.ProductVersion` from the resolved claude.exe and display it in the footer alongside the launcher version (e.g. `Launcher v1.7.1 - Claude 1.3109.0.0`). New `IClaudeVersionResolver` service + property on `MainWindowViewModel` + text in the footer region of `MainWindow.axaml`.
-- [ ] **Split UI for launcher-managed vs externally-launched Claude instances** - detect claude.exe processes with no `--user-data-dir=ClaudeSlot...` pattern and surface them as a separate row. Needs a design pass first: is `external` meant as (a) default-profile Claude from Start menu/taskbar, (b) slot-profile Claude launched before the launcher started, or (c) both? Kill semantics also need nailing down (we should not kill a process we did not start without clearer consent).
+- [x] **Split UI for launcher-managed vs externally-launched Claude instances** - windowed claude.exe processes are now cleanly split into two lists: the slot list (top) for processes with `--user-data-dir=...\ClaudeSlotN`, and the External Claude instances section (bottom) for everything else (default-profile Claude launched from the Start menu, or Claude launched by some other tool). Each windowed Claude appears in exactly one list, never both.
+    - Required a non-obvious WMI enrichment fix: Chromium/Electron's "browser main" process (the one with the visible window) reports an empty args list to WMI - its `--user-data-dir` flag is only copied into child processes during fork. `WmiClaudeProcessScanner` now queries `ParentProcessId` too, walks each windowed main's direct children, and when the main's own cmdline is missing the flag, extracts `--user-data-dir=...` from any child and appends it. Without this, every windowed Claude mis-classified as external.
+    - Windowed-only filter via `Process.MainWindowHandle != IntPtr.Zero` suppresses the ~10 Electron child processes (renderer, GPU, crashpad, audio/video/network utility services) that would otherwise flood the UI.
+    - Slot list now relabels `InstanceNumber` with the real slot number from the cmdline, not the sequential enumeration index. Slot 3 renders as "Instance 3" even when slots 1 and 2 are closed (the previous enumeration approach mis-labelled this case).
+    - New `SlotInstanceListViewModel` (parallel to `ExternalInstanceListViewModel`) owns the filter + reconcile pipeline. Reconciliation is identity-preserving (same VM instance per slot number across refreshes), so row-level state like edit-in-progress name text survives.
+    - Close button on external rows pops a custom destructive-severity `ConfirmDialog` (new `IConfirmDialogService` + `Views/ConfirmDialog.axaml`) with PID, uptime and full command line before calling `IProcessService.KillProcess`. User cancel is the default - Esc and the window close button both cancel.
+- [x] **Launch sequencing owned by `ClaudeInstanceLauncher`** - new `LaunchInstances(int count)` method owns the full slot-pick + seed + launch sequence. `MainWindowViewModel` no longer depends on `ISlotManager` or `ISlotInitialiser`; it just calls `_launcher.LaunchInstances(SlotCount)`.
 - [x] **`Copy window screenshot to clipboard` button** - shipped in v1.7.3 using Avalonia 12's `RenderTargetBitmap.Render(visual)` + `ClipboardExtensions.SetBitmapAsync` (not GDI) - rendering the visual tree directly gives reliable results regardless of window state (maximised, partially covered, off-screen) that the original GDI `CopyFromScreen` approach would have struggled with. Image lands on the clipboard in every relevant Windows format simultaneously (`image/png`, `PNG`, `DeviceIndependentBitmap`, `Format17`, `Bitmap`) so it pastes into Slack/Discord/Word/Paint without fuss.
+- [x] 229 tests passing (up from 162 in v1.7.1), zero warnings, zero errors
+
+## v1.8.1 - Planned
+- [ ] **Custom app icon** - replace the default Avalonia logo. Single SVG/PNG source -> `.ico` with nested 16/24/32/48/64/256 px variants (Explorer, taskbar, Start menu) + 256x256 `.png` for the Avalonia window icon resource. Three hookup points: `<ApplicationIcon>` in csproj (exe/file icon), `<Window Icon="avares://.../appicon.png" />` in `MainWindow.axaml` (title-bar + running-taskbar), and `TrayIconService` (tray icon while minimised).
 
 ## v2.0 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)

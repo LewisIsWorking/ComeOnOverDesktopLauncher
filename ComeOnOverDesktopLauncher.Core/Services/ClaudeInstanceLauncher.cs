@@ -8,21 +8,44 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// Uses unique --user-data-dir per slot so login sessions persist between launches.
 /// Every launch attempt is logged with the resolved path, data dir and outcome
 /// so that silent failures can be diagnosed from the log file.
+///
+/// Owns the full launch sequence (slot picking + seeding + process
+/// start) so view-model and future CLI callers only need to say "launch
+/// N instances" without re-implementing the coordination dance.
 /// </summary>
 public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
 {
     private readonly IClaudePathResolver _pathResolver;
+    private readonly ISlotManager _slotManager;
+    private readonly ISlotInitialiser _slotInitialiser;
     private readonly IProcessService _processService;
     private readonly ILoggingService _logger;
 
     public ClaudeInstanceLauncher(
         IClaudePathResolver pathResolver,
+        ISlotManager slotManager,
+        ISlotInitialiser slotInitialiser,
         IProcessService processService,
         ILoggingService logger)
     {
         _pathResolver = pathResolver;
+        _slotManager = slotManager;
+        _slotInitialiser = slotInitialiser;
         _processService = processService;
         _logger = logger;
+    }
+
+    public IReadOnlyList<LaunchSlot> LaunchInstances(int count)
+    {
+        var slots = _slotManager.GetNextFreeSlots(count);
+        _logger.LogInfo(
+            $"Picked free slot(s): {string.Join(", ", slots.Select(s => s.SlotNumber))}");
+        foreach (var slot in slots)
+        {
+            _slotInitialiser.EnsureInitialised(slot);
+            LaunchSlot(slot);
+        }
+        return slots;
     }
 
     public void LaunchSlot(LaunchSlot slot)

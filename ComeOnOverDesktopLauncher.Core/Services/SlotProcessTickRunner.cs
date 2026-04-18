@@ -5,7 +5,7 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 
 /// <summary>
 /// Pure state machine that, given a stream of
-/// <see cref="IProcessService.GetSlotProcesses"/> snapshots, emits a
+/// <see cref="IClaudeProcessScanner.Scan"/> snapshots, emits a
 /// <see cref="LaunchSlot"/> for each slot that was seen in a previous tick
 /// but is absent from the current tick.
 ///
@@ -14,18 +14,24 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// </summary>
 public class SlotProcessTickRunner
 {
-    private readonly IProcessService _processService;
+    private readonly IClaudeProcessScanner _scanner;
+    private readonly IClaudeProcessClassifier _classifier;
     private HashSet<int> _previouslySeenSlots = new();
 
-    public SlotProcessTickRunner(IProcessService processService)
+    public SlotProcessTickRunner(
+        IClaudeProcessScanner scanner,
+        IClaudeProcessClassifier classifier)
     {
-        _processService = processService;
+        _scanner = scanner;
+        _classifier = classifier;
     }
 
     public IReadOnlyList<LaunchSlot> Tick()
     {
-        var currentSlots = _processService.GetSlotProcesses()
-            .Select(info => info.SlotNumber)
+        var currentSlots = _scanner.Scan()
+            .Select(p => _classifier.TryClassifyAsSlot(p))
+            .Where(info => info is not null)
+            .Select(info => info!.SlotNumber)
             .ToHashSet();
 
         var closed = _previouslySeenSlots

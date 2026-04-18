@@ -1,5 +1,4 @@
 using ComeOnOverDesktopLauncher.Core.Models;
-using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.ViewModels;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -8,160 +7,123 @@ namespace ComeOnOverDesktopLauncher.Tests.ViewModels;
 
 public class MainWindowViewModelTests
 {
-    private readonly IClaudeInstanceLauncher _launcher = Substitute.For<IClaudeInstanceLauncher>();
-    private readonly ISlotManager _slotManager = Substitute.For<ISlotManager>();
-    private readonly ISlotInitialiser _slotInitialiser = Substitute.For<ISlotInitialiser>();
-    private readonly IComeOnOverAppService _cooService = Substitute.For<IComeOnOverAppService>();
-    private readonly ISettingsService _settingsService = Substitute.For<ISettingsService>();
-    private readonly IClaudePathResolver _pathResolver = Substitute.For<IClaudePathResolver>();
-    private readonly IResourceMonitor _resourceMonitor = Substitute.For<IResourceMonitor>();
-    private readonly IStartupService _startupService = Substitute.For<IStartupService>();
-    private readonly IVersionProvider _versionProvider = Substitute.For<IVersionProvider>();
-    private readonly IUpdateNotifier _updateNotifier = Substitute.For<IUpdateNotifier>();
-    private readonly IClaudeVersionResolver _claudeVersionResolver = Substitute.For<IClaudeVersionResolver>();
-    private readonly IProcessService _processService = Substitute.For<IProcessService>();
-    private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
-
-    private MainWindowViewModel CreateSut(AppSettings? settings = null)
-    {
-        _settingsService.Load().Returns(settings ?? new AppSettings { DefaultSlotCount = 2 });
-        _versionProvider.GetVersion().Returns("1.3.0");
-        return new MainWindowViewModel(
-            _launcher, _slotManager, _slotInitialiser, _cooService,
-            _settingsService, _pathResolver, _resourceMonitor,
-            _startupService, _updateNotifier, _versionProvider,
-            _claudeVersionResolver,
-            _processService, _logger);
-    }
+    private readonly MainWindowViewModelTestFixture _f = new();
 
     [Fact]
     public void Constructor_LoadsSlotCountFromSettings()
     {
-        Assert.Equal(2, CreateSut().SlotCount);
+        Assert.Equal(2, _f.CreateSut().SlotCount);
     }
 
     [Fact]
     public void Constructor_SetsAppVersionFromProvider()
     {
-        Assert.Equal("v1.3.0", CreateSut().AppVersion);
+        Assert.Equal("v1.3.0", _f.CreateSut().AppVersion);
     }
 
     [Fact]
     public void Constructor_SetsClaudeVersionFromResolver()
     {
-        _claudeVersionResolver.GetClaudeVersion().Returns("1.3109.0.0");
-        Assert.Equal("1.3109.0.0", CreateSut().ClaudeVersion);
+        _f.ClaudeVersionResolver.GetClaudeVersion().Returns("1.3109.0.0");
+        Assert.Equal("1.3109.0.0", _f.CreateSut().ClaudeVersion);
     }
 
     [Fact]
     public void Constructor_WhenClaudeVersionIsNull_FooterShowsAppVersionOnly()
     {
-        _claudeVersionResolver.GetClaudeVersion().Returns((string?)null);
-        Assert.Equal("v1.3.0", CreateSut().FooterVersionText);
+        _f.ClaudeVersionResolver.GetClaudeVersion().Returns((string?)null);
+        Assert.Equal("v1.3.0", _f.CreateSut().FooterVersionText);
     }
 
     [Fact]
     public void Constructor_WhenClaudeVersionIsKnown_FooterShowsBoth()
     {
-        _claudeVersionResolver.GetClaudeVersion().Returns("1.3109.0.0");
-        Assert.Equal("v1.3.0 - Claude 1.3109.0.0", CreateSut().FooterVersionText);
+        _f.ClaudeVersionResolver.GetClaudeVersion().Returns("1.3109.0.0");
+        Assert.Equal("v1.3.0 - Claude 1.3109.0.0", _f.CreateSut().FooterVersionText);
     }
 
     [Fact]
     public void Constructor_SetsLaunchOnStartupFromStartupService()
     {
-        _startupService.IsStartupEnabled().Returns(true);
-        Assert.True(CreateSut().LaunchOnStartup);
+        _f.StartupService.IsStartupEnabled().Returns(true);
+        Assert.True(_f.CreateSut().LaunchOnStartup);
     }
 
     [Fact]
     public void Constructor_SetsIsClaudeInstalledFromResolver()
     {
-        _pathResolver.IsClaudeInstalled().Returns(true);
-        Assert.True(CreateSut().IsClaudeInstalled);
+        _f.PathResolver.IsClaudeInstalled().Returns(true);
+        Assert.True(_f.CreateSut().IsClaudeInstalled);
     }
 
     [Fact]
     public void Constructor_LoadsRunningInstanceCount()
     {
-        _launcher.GetRunningInstanceCount().Returns(3);
-        Assert.Equal(3, CreateSut().RunningInstanceCount);
+        _f.Launcher.GetRunningInstanceCount().Returns(3);
+        Assert.Equal(3, _f.CreateSut().RunningInstanceCount);
+    }
+
+    [Fact]
+    public void Constructor_ExternalInstancesIsNonNull()
+    {
+        Assert.NotNull(_f.CreateSut().ExternalInstances);
+    }
+
+    [Fact]
+    public void Constructor_SlotInstancesIsNonNull()
+    {
+        Assert.NotNull(_f.CreateSut().SlotInstances);
     }
 
     [Fact]
     public void HasRunningInstances_WhenCountIsZero_ReturnsFalse()
     {
-        _launcher.GetRunningInstanceCount().Returns(0);
-        Assert.False(CreateSut().HasRunningInstances);
+        _f.Launcher.GetRunningInstanceCount().Returns(0);
+        Assert.False(_f.CreateSut().HasRunningInstances);
     }
 
     [Fact]
     public void HasRunningInstances_WhenCountIsPositive_ReturnsTrue()
     {
-        _launcher.GetRunningInstanceCount().Returns(2);
-        Assert.True(CreateSut().HasRunningInstances);
+        _f.Launcher.GetRunningInstanceCount().Returns(2);
+        Assert.True(_f.CreateSut().HasRunningInstances);
     }
 
     [Fact]
     public void LaunchOnStartup_WhenSetToTrue_CallsEnableStartup()
     {
-        var sut = CreateSut();
+        var sut = _f.CreateSut();
         sut.LaunchOnStartup = true;
-        _startupService.Received().EnableStartup(Arg.Any<string>());
+        _f.StartupService.Received().EnableStartup(Arg.Any<string>());
     }
 
     [Fact]
     public void LaunchOnStartup_WhenSetToFalse_CallsDisableStartup()
     {
-        _startupService.IsStartupEnabled().Returns(true);
-        var sut = CreateSut();
+        _f.StartupService.IsStartupEnabled().Returns(true);
+        var sut = _f.CreateSut();
         sut.LaunchOnStartup = false;
-        _startupService.Received().DisableStartup();
+        _f.StartupService.Received().DisableStartup();
     }
 
     [Fact]
-    public void LaunchInstancesCommand_InitialisesEachSlotBeforeLaunching()
+    public void LaunchInstancesCommand_DelegatesToLauncher()
     {
-        _slotManager.GetNextFreeSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
-        var sut = CreateSut();
+        _f.Launcher.LaunchInstances(Arg.Any<int>()).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
+        var sut = _f.CreateSut();
+        sut.SlotCount = 2;
 
         sut.LaunchInstancesCommand.Execute(null);
 
-        _slotInitialiser.Received(2).EnsureInitialised(Arg.Any<LaunchSlot>());
-    }
-
-    [Fact]
-    public void LaunchInstancesCommand_LaunchesCorrectNumberOfSlots()
-    {
-        _slotManager.GetNextFreeSlots(2).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
-        var sut = CreateSut();
-
-        sut.LaunchInstancesCommand.Execute(null);
-
-        _launcher.Received(2).LaunchSlot(Arg.Any<LaunchSlot>());
-    }
-
-    [Fact]
-    public void LaunchInstancesCommand_InitialisesBeforeLaunching()
-    {
-        var slot = new LaunchSlot(1);
-        _slotManager.GetNextFreeSlots(Arg.Any<int>()).Returns([slot]);
-        var callOrder = new List<string>();
-        _slotInitialiser.When(s => s.EnsureInitialised(slot)).Do(_ => callOrder.Add("init"));
-        _launcher.When(l => l.LaunchSlot(slot)).Do(_ => callOrder.Add("launch"));
-        var sut = CreateSut();
-
-        sut.LaunchInstancesCommand.Execute(null);
-
-        Assert.Equal(["init", "launch"], callOrder);
+        _f.Launcher.Received(1).LaunchInstances(2);
     }
 
     [Fact]
     public void LaunchInstancesCommand_UpdatesRunningInstanceCount()
     {
-        _slotManager.GetNextFreeSlots(Arg.Any<int>()).Returns([new LaunchSlot(1)]);
-        _launcher.GetRunningInstanceCount().Returns(2);
-        var sut = CreateSut();
+        _f.Launcher.LaunchInstances(Arg.Any<int>()).Returns([new LaunchSlot(1)]);
+        _f.Launcher.GetRunningInstanceCount().Returns(2);
+        var sut = _f.CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);
 
@@ -169,10 +131,21 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
+    public void LaunchInstancesCommand_UpdatesStatusMessageWithLaunchedCount()
+    {
+        _f.Launcher.LaunchInstances(Arg.Any<int>()).Returns([new LaunchSlot(1), new LaunchSlot(2)]);
+        var sut = _f.CreateSut();
+
+        sut.LaunchInstancesCommand.Execute(null);
+
+        Assert.Contains("2 instance", sut.StatusMessage);
+    }
+
+    [Fact]
     public void LaunchInstancesCommand_WhenExceptionThrown_SetsErrorStatusMessage()
     {
-        _slotManager.GetNextFreeSlots(Arg.Any<int>()).Throws(new InvalidOperationException("Test error"));
-        var sut = CreateSut();
+        _f.Launcher.LaunchInstances(Arg.Any<int>()).Throws(new InvalidOperationException("Test error"));
+        var sut = _f.CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);
 
@@ -182,14 +155,14 @@ public class MainWindowViewModelTests
     [Fact]
     public void LaunchComeOnOverCommand_LaunchesCooService()
     {
-        CreateSut().LaunchComeOnOverCommand.Execute(null);
-        _cooService.Received(1).Launch();
+        _f.CreateSut().LaunchComeOnOverCommand.Execute(null);
+        _f.CooService.Received(1).Launch();
     }
 
     [Fact]
     public void LaunchComeOnOverCommand_UpdatesStatusMessage()
     {
-        var sut = CreateSut();
+        var sut = _f.CreateSut();
         sut.LaunchComeOnOverCommand.Execute(null);
         Assert.Contains("ComeOnOver", sut.StatusMessage);
     }
@@ -197,10 +170,10 @@ public class MainWindowViewModelTests
     [Fact]
     public void RefreshResourcesCommand_UpdatesTotalsFromMonitor()
     {
-        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>());
-        _resourceMonitor.TotalRamMb.Returns(512.0);
-        _resourceMonitor.TotalCpuPercent.Returns(8.5);
-        var sut = CreateSut();
+        _f.ResourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>());
+        _f.ResourceMonitor.TotalRamMb.Returns(512.0);
+        _f.ResourceMonitor.TotalCpuPercent.Returns(8.5);
+        var sut = _f.CreateSut();
 
         sut.RefreshResourcesCommand.Execute(null);
 
@@ -209,30 +182,27 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public void RefreshResourcesCommand_SyncsInstanceCollection()
+    public void RefreshResourcesCommand_RefreshesSlotInstances()
     {
-        var sut = CreateSut();
-        _resourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>
-        {
-            new(1, 1, 5.0, 200 * 1024 * 1024, TimeSpan.FromMinutes(10))
-        });
+        _f.ResourceMonitor.GetSnapshots().Returns(new List<InstanceResourceSnapshot>());
+        _f.Scanner.Scan().Returns(Array.Empty<ClaudeProcessInfo>());
+        var sut = _f.CreateSut();
 
         sut.RefreshResourcesCommand.Execute(null);
 
-        Assert.Single(sut.Instances);
-        Assert.Equal(5.0, sut.Instances[0].CpuPercent);
+        // Slot VM + external VM both use the scanner on refresh, so we
+        // expect at least 2 calls (one from each list VM).
+        Assert.True(_f.Scanner.ReceivedCalls().Count() >= 2);
     }
 
     [Fact]
     public void SaveSettingsCommand_PersistsCurrentSlotCount()
     {
-        var sut = CreateSut();
+        var sut = _f.CreateSut();
         sut.SlotCount = 4;
 
         sut.SaveSettingsCommand.Execute(null);
 
-        _settingsService.Received().Save(Arg.Is<AppSettings>(s => s.DefaultSlotCount == 4));
+        _f.SettingsService.Received().Save(Arg.Is<AppSettings>(s => s.DefaultSlotCount == 4));
     }
 }
-
-

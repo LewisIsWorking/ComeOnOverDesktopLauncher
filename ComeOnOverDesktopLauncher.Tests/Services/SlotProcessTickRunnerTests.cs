@@ -7,23 +7,47 @@ namespace ComeOnOverDesktopLauncher.Tests.Services;
 
 public class SlotProcessTickRunnerTests
 {
-    private readonly IProcessService _processService = Substitute.For<IProcessService>();
-    private SlotProcessTickRunner CreateSut() => new(_processService);
+    private readonly IClaudeProcessScanner _scanner = Substitute.For<IClaudeProcessScanner>();
+    private readonly IClaudeProcessClassifier _classifier = Substitute.For<IClaudeProcessClassifier>();
 
-    private static SlotProcessInfo Info(int slotNumber, int pid = 100) =>
-        new(pid, slotNumber);
+    private SlotProcessTickRunner CreateSut() => new(_scanner, _classifier);
+
+    private static ClaudeProcessInfo Claude(int pid) =>
+        new(pid, "", DateTime.UtcNow);
+
+    /// <summary>
+    /// Configures the scanner to return the given Claude processes and the
+    /// classifier to map each one to a <see cref="SlotProcessInfo"/> with the
+    /// corresponding slot number. Used by every test below so the scanner +
+    /// classifier wiring stays out of the assertions.
+    /// </summary>
+    private void ReturnSlots(params (int pid, int slotNumber)[] mappings)
+    {
+        var procs = mappings.Select(m => Claude(m.pid)).ToArray();
+        _scanner.Scan().Returns(procs);
+        for (var i = 0; i < mappings.Length; i++)
+        {
+            var m = mappings[i];
+            _classifier.TryClassifyAsSlot(procs[i]).Returns(new SlotProcessInfo(m.pid, m.slotNumber));
+        }
+    }
+
+    private void ReturnNoProcesses()
+    {
+        _scanner.Scan().Returns(Array.Empty<ClaudeProcessInfo>());
+    }
 
     [Fact]
     public void Tick_WhenNoProcesses_ReturnsEmpty()
     {
-        _processService.GetSlotProcesses().Returns(Array.Empty<SlotProcessInfo>());
+        ReturnNoProcesses();
         Assert.Empty(CreateSut().Tick());
     }
 
     [Fact]
     public void Tick_FirstAppearance_DoesNotEmitClosedEvent()
     {
-        _processService.GetSlotProcesses().Returns(new[] { Info(1) });
+        ReturnSlots((100, 1));
         Assert.Empty(CreateSut().Tick());
     }
 
@@ -31,10 +55,10 @@ public class SlotProcessTickRunnerTests
     public void Tick_WhenKnownSlotDisappears_EmitsClosedEvent()
     {
         var sut = CreateSut();
-        _processService.GetSlotProcesses().Returns(new[] { Info(1) });
-        sut.Tick(); // seed: slot 1 known
+        ReturnSlots((100, 1));
+        sut.Tick();
 
-        _processService.GetSlotProcesses().Returns(Array.Empty<SlotProcessInfo>());
+        ReturnNoProcesses();
         var closed = sut.Tick();
 
         Assert.Single(closed);
@@ -45,10 +69,10 @@ public class SlotProcessTickRunnerTests
     public void Tick_WhenOneOfManySlotsDisappears_EmitsOnlyThatOne()
     {
         var sut = CreateSut();
-        _processService.GetSlotProcesses().Returns(new[] { Info(1, 100), Info(2, 200) });
-        sut.Tick(); // seed: slots 1 and 2 known
+        ReturnSlots((100, 1), (200, 2));
+        sut.Tick();
 
-        _processService.GetSlotProcesses().Returns(new[] { Info(2, 200) });
+        ReturnSlots((200, 2));
         var closed = sut.Tick();
 
         Assert.Single(closed);
@@ -59,7 +83,7 @@ public class SlotProcessTickRunnerTests
     public void Tick_WhenSlotStaysRunning_NoEventEmitted()
     {
         var sut = CreateSut();
-        _processService.GetSlotProcesses().Returns(new[] { Info(1) });
+        ReturnSlots((100, 1));
         sut.Tick();
         var closed = sut.Tick();
         Assert.Empty(closed);
@@ -69,9 +93,9 @@ public class SlotProcessTickRunnerTests
     public void Tick_WhenOneSlotClosesAndAnotherStarts_EmitsOnlyClosed()
     {
         var sut = CreateSut();
-        _processService.GetSlotProcesses().Returns(new[] { Info(1) });
+        ReturnSlots((100, 1));
         sut.Tick();
-        _processService.GetSlotProcesses().Returns(new[] { Info(2) });
+        ReturnSlots((200, 2));
 
         var closed = sut.Tick();
 

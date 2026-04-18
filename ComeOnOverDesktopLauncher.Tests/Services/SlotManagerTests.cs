@@ -8,7 +8,13 @@ namespace ComeOnOverDesktopLauncher.Tests.Services;
 public class SlotManagerTests
 {
     private readonly IProcessService _processService = Substitute.For<IProcessService>();
-    private SlotManager CreateSut() => new(_processService);
+    private readonly IClaudeProcessScanner _scanner = Substitute.For<IClaudeProcessScanner>();
+    private readonly IClaudeProcessClassifier _classifier = Substitute.For<IClaudeProcessClassifier>();
+
+    private SlotManager CreateSut() => new(_processService, _scanner, _classifier);
+
+    private static ClaudeProcessInfo Claude(int pid, string cmdLine = "") =>
+        new(pid, cmdLine, DateTime.UtcNow);
 
     [Fact]
     public void GetSlots_ReturnsCorrectCount()
@@ -61,7 +67,7 @@ public class SlotManagerTests
     [Fact]
     public void GetNextFreeSlots_WhenNoneOccupied_ReturnsSlotsStartingFromOne()
     {
-        _processService.GetSlotProcesses().Returns(new List<SlotProcessInfo>());
+        _scanner.Scan().Returns(Array.Empty<ClaudeProcessInfo>());
 
         var slots = CreateSut().GetNextFreeSlots(3);
 
@@ -71,11 +77,11 @@ public class SlotManagerTests
     [Fact]
     public void GetNextFreeSlots_SkipsOccupiedSlots()
     {
-        _processService.GetSlotProcesses().Returns(new List<SlotProcessInfo>
-        {
-            new(100, 1),
-            new(101, 3)
-        });
+        var proc1 = Claude(100);
+        var proc3 = Claude(101);
+        _scanner.Scan().Returns(new[] { proc1, proc3 });
+        _classifier.TryClassifyAsSlot(proc1).Returns(new SlotProcessInfo(100, 1));
+        _classifier.TryClassifyAsSlot(proc3).Returns(new SlotProcessInfo(101, 3));
 
         var slots = CreateSut().GetNextFreeSlots(3);
 
@@ -97,21 +103,29 @@ public class SlotManagerTests
     [Fact]
     public void GetNextFreeSlots_WhenAllSlotsInRangeOccupied_Throws()
     {
-        var occupied = Enumerable.Range(1, 100)
-            .Select(n => new SlotProcessInfo(1000 + n, n))
-            .ToList();
-        _processService.GetSlotProcesses().Returns(occupied);
+        var procs = Enumerable.Range(1, 100)
+            .Select(n => Claude(1000 + n))
+            .ToArray();
+        _scanner.Scan().Returns(procs);
+        for (var n = 1; n <= 100; n++)
+        {
+            var slotNumber = n;
+            _classifier.TryClassifyAsSlot(procs[n - 1])
+                .Returns(new SlotProcessInfo(1000 + slotNumber, slotNumber));
+        }
 
         Assert.Throws<InvalidOperationException>(() => CreateSut().GetNextFreeSlots(1));
     }
 
     [Fact]
-    public void GetNextFreeSlots_DoesNotConsiderNonSlotProcesses()
+    public void GetNextFreeSlots_IgnoresExternalProcesses()
     {
-        // External Claude (default profile) is NOT returned by GetSlotProcesses,
-        // so SlotManager should not see it and slot 1 should still be free.
-        _processService.GetSlotProcesses().Returns(new List<SlotProcessInfo>());
-        _processService.CountByNameWithWindow("claude").Returns(5);
+        // External Claude (default profile) is classified as null by
+        // TryClassifyAsSlot, so SlotManager should not see it and slot 1
+        // should still be free.
+        var external = Claude(999);
+        _scanner.Scan().Returns(new[] { external });
+        _classifier.TryClassifyAsSlot(external).Returns((SlotProcessInfo?)null);
 
         var slots = CreateSut().GetNextFreeSlots(1);
 
