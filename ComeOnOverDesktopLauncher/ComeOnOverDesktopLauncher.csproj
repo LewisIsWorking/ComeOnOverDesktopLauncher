@@ -6,8 +6,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <Version>1.7.2</Version>
-        <AssemblyVersion>1.7.2</AssemblyVersion>
+        <Version>1.7.3</Version>
+        <AssemblyVersion>1.7.3</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>

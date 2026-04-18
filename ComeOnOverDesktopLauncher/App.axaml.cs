@@ -42,7 +42,11 @@ public partial class App : Application
         {
             var startMinimised = desktop.Args?.Contains("--minimised") == true;
             var viewModel = _serviceProvider.GetRequiredService<MainWindowViewModel>();
-            _mainWindow = new MainWindow { DataContext = viewModel };
+            _mainWindow = new MainWindow
+            {
+                DataContext = viewModel,
+                SnapshotService = _serviceProvider.GetRequiredService<IWindowSnapshotService>()
+            };
 
             desktop.MainWindow = _mainWindow;
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -107,6 +111,7 @@ public partial class App : Application
         services.AddSingleton<IUpdateChecker, GitHubUpdateChecker>();
         services.AddSingleton<IUpdateNotifier, UpdateNotifier>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
+        services.AddSingleton<IWindowSnapshotService, WindowSnapshotService>();
         services.AddTransient<MainWindowViewModel>();
 
         return services;
