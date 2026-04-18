@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ComeOnOver Desktop Launcher app icon - v1.8.1 (direction A)
+
+  Design: three diagonally-cascaded rounded "window" shapes suggesting
+  multiple Claude instances, on a dark rounded-square backdrop. Yellow
+  amber mark (#FFC107) matches the launcher's own title-bar accent so
+  the icon reads as "this app" when it sits next to the launcher window
+  on the taskbar.
+
+  Opacity stack 0.35 / 0.62 / 1.0 gives depth without needing gradients
+  (which are forbidden per the repo design rules and also render poorly
+  at small icon sizes). The title-bar dots inside each window sell the
+  "windows not cards" reading at 64px+; they naturally drop off at
+  16-32px where the cascade silhouette alone carries the semantic.
+
+  Source lives here at 1024x1024; rasterise via build-icons.ps1 to
+  produce the .ico (multi-resolution nested) and the PNG variants
+  consumed by MainWindow.axaml and TrayIconService.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+
+  <!-- Dark rounded-square backdrop matches the app's Background="#1E1E1E"
+       exactly. rx=180 ≈ 17.5% of canvas is the Windows 11 standard app
+       icon corner radius. -->
+  <rect x="0" y="0" width="1024" height="1024" rx="180" fill="#1E1E1E"/>
+
+  <!-- Three stacked Claude-window glyphs cascading top-left to
+       bottom-right. Each window is 512x400 (golden-ratio-ish) with a
+       38px corner radius (~7% of width, matching typical OS window
+       chrome). 128px diagonal offset between stack members keeps the
+       rearmost window's top-left and the frontmost window's bottom-
+       right both comfortably inside the canvas safe area. -->
+
+  <!-- Window 3 (rearmost) -->
+  <g opacity="0.35">
+    <rect x="192" y="192" width="512" height="400" rx="38" fill="#FFC107"/>
+    <rect x="237" y="237" width="90" height="26" rx="6" fill="#000" opacity="0.35"/>
+  </g>
+
+  <!-- Window 2 (mid) -->
+  <g opacity="0.62">
+    <rect x="320" y="333" width="512" height="400" rx="38" fill="#FFC107"/>
+    <rect x="365" y="378" width="90" height="26" rx="6" fill="#000" opacity="0.35"/>
+  </g>
+
+  <!-- Window 1 (frontmost) -->
+  <g opacity="1">
+    <rect x="448" y="474" width="512" height="400" rx="38" fill="#FFC107"/>
+    <rect x="493" y="519" width="90" height="26" rx="6" fill="#000" opacity="0.35"/>
+  </g>
+
+</svg>

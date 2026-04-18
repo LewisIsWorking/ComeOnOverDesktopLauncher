@@ -14,8 +14,11 @@ public class TrayIconService : ITrayIconService
 
     public void Initialise(Action onShow, Action onLaunchClaude, Action onQuit)
     {
+        // Uses the multi-resolution appicon.ico (16/24/32/48/64/128/256
+        // nested) so Windows picks the appropriate size for the tray -
+        // typically 16 or 20 depending on DPI scaling.
         var icon = new WindowIcon(
-            AssetLoader.Open(new Uri("avares://ComeOnOverDesktopLauncher/Assets/avalonia-logo.ico")));
+            AssetLoader.Open(new Uri("avares://ComeOnOverDesktopLauncher/Assets/appicon.ico")));
 
         var menu = new NativeMenu();
 

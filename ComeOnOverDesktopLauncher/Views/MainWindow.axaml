@@ -4,6 +4,7 @@
         x:Class="ComeOnOverDesktopLauncher.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="ComeOnOver Desktop Launcher"
+        Icon="avares://ComeOnOverDesktopLauncher/Assets/appicon-256.png"
         Width="440" Height="520"
         MinWidth="360" MinHeight="400"
         WindowStartupLocation="CenterScreen"

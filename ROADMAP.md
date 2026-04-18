@@ -106,8 +106,15 @@
 - [x] **`Copy window screenshot to clipboard` button** - shipped in v1.7.3 using Avalonia 12's `RenderTargetBitmap.Render(visual)` + `ClipboardExtensions.SetBitmapAsync` (not GDI) - rendering the visual tree directly gives reliable results regardless of window state (maximised, partially covered, off-screen) that the original GDI `CopyFromScreen` approach would have struggled with. Image lands on the clipboard in every relevant Windows format simultaneously (`image/png`, `PNG`, `DeviceIndependentBitmap`, `Format17`, `Bitmap`) so it pastes into Slack/Discord/Word/Paint without fuss.
 - [x] 229 tests passing (up from 162 in v1.7.1), zero warnings, zero errors
 
-## v1.8.1 - Planned
-- [ ] **Custom app icon** - replace the default Avalonia logo. Single SVG/PNG source -> `.ico` with nested 16/24/32/48/64/256 px variants (Explorer, taskbar, Start menu) + 256x256 `.png` for the Avalonia window icon resource. Three hookup points: `<ApplicationIcon>` in csproj (exe/file icon), `<Window Icon="avares://.../appicon.png" />` in `MainWindow.axaml` (title-bar + running-taskbar), and `TrayIconService` (tray icon while minimised).
+## v1.8.1 - Released
+
+![v1.8.1 UI](docs/screenshots/photo_2026-04-18_v1.8.1.png)
+
+- [x] **Custom app icon** - three diagonally-cascaded amber windows on a dark rounded-square backdrop, matching the launcher's own title-bar accent (#FFC107 on #1E1E1E) so the icon reads as "this app" when it sits next to the launcher window on the taskbar. The stacked-window glyph literally depicts what the launcher does (opens multiple Claude instances) and the silhouette survives aggressive downscaling to 32px without losing meaning.
+    - **Source**: single authoritative `docs/design/appicon.svg` at 1024x1024. Opacity stack 0.35 / 0.62 / 1.0 gives depth without gradients (forbidden per the design rules and bad for small-size rendering anyway). Tiny title-bar dots inside each window sell the "windows not cards" reading at 64px+; they drop off at 16-32px where the cascade silhouette alone carries the semantic.
+    - **Build pipeline**: `docs/design/build-icons.ps1` rasterises the SVG via ImageMagick (`winget install ImageMagick.ImageMagick`) into `appicon.ico` (nested 16/24/32/48/64/128/256), `appicon-256.png`, `appicon-64.png`, `appicon-32.png`. Idempotent, checked into repo, one-liner to re-run after any SVG tweak.
+    - **Three hookup points**: `<ApplicationIcon>` in csproj (Explorer/Start menu/pinned shortcut exe icon), `<Window Icon="avares://.../appicon-256.png" />` in MainWindow.axaml (title-bar + running-taskbar), and `TrayIconService` (system tray icon while minimised). Generated binaries committed alongside the SVG so the release CI runner doesn't need ImageMagick.
+    - **Cleanup**: default `Assets/avalonia-logo.ico` removed (no remaining references).
 
 ## v2.0 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)

@@ -5,9 +5,10 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <ApplicationManifest>app.manifest</ApplicationManifest>
+        <ApplicationIcon>Assets\appicon.ico</ApplicationIcon>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <Version>1.8.0</Version>
-        <AssemblyVersion>1.8.0</AssemblyVersion>
+        <Version>1.8.1</Version>
+        <AssemblyVersion>1.8.1</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>
