@@ -75,8 +75,23 @@
 - [x] CPU / RAM / Up columns are vertically under Total RAM / Total CPU columns
 - [x] Close button column aligns with the "Logs" button column
 
-## v1.7 - Next
+## v1.7 - Released
+
+![v1.7 UI](docs/screenshots/photo_2026-04-17_v1.7.0.png)
+
+- [x] **Seed cache** - persistent `%APPDATA%\ComeOnOverDesktopLauncher\seed\` snapshot of a known-good Claude login state (Cookies + Local State + Preferences)
+- [x] New `ISlotSeedCache` / `FileSlotSeedCache` services capture and apply the snapshot atomically; failed captures leave the previous cache intact
+- [x] SQLite magic-header + JSON `os_crypt.encrypted_key` validation rejects corrupt or half-written cache files
+- [x] `SlotInitialiser` now seeds from the cache *first*, falling back to default-profile / other-slot Cookies only when the cache has never been populated
+- [x] New slots opened while the default Claude profile is running now come up logged in (previously required closing Claude first)
+- [x] New `ISlotProcessMonitor` / `SlotProcessMonitor` polls running Claude slots and raises `SlotClosed` events
+- [x] Pure-function `SlotProcessTickRunner` extracted so transition logic is unit-testable without a real timer
+- [x] `SlotSeedCacheUpdater` subscribes to `SlotClosed`, waits 5s for Electron helpers to release locks, then opportunistically refreshes the seed cache
+- [x] 162 tests passing (up from 119), zero warnings, zero errors
+
+## v1.8 - Next
 - [ ] Show Claude Desktop version in UI
+- [ ] Split UI to distinguish launcher-managed vs externally-launched Claude instances
 
 ## v2.0 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)

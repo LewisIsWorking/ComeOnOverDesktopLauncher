@@ -20,6 +20,8 @@ public partial class App : Application
     private ServiceProvider? _serviceProvider;
     private MainWindow? _mainWindow;
     private ITrayIconService? _trayIconService;
+    private ISlotProcessMonitor? _slotProcessMonitor;
+    private SlotSeedCacheUpdater? _seedCacheUpdater;
 
     public override void Initialize()
     {
@@ -30,6 +32,11 @@ public partial class App : Application
     {
         _serviceProvider = ConfigureServices().BuildServiceProvider();
         _serviceProvider.GetRequiredService<IClaudePathCache>().Refresh();
+
+        _slotProcessMonitor = _serviceProvider.GetRequiredService<ISlotProcessMonitor>();
+        _slotProcessMonitor.Start(TimeSpan.FromSeconds(2));
+        _seedCacheUpdater = _serviceProvider.GetRequiredService<SlotSeedCacheUpdater>();
+        _seedCacheUpdater.Start();
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -57,6 +64,8 @@ public partial class App : Application
             onLaunchClaude: () => viewModel.LaunchInstancesCommand.Execute(null),
             onQuit: () =>
             {
+                _seedCacheUpdater?.Stop();
+                _slotProcessMonitor?.Stop();
                 _trayIconService.Dispose();
                 desktop.Shutdown();
             });
@@ -83,6 +92,9 @@ public partial class App : Application
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
         services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
         services.AddSingleton<ISlotManager, SlotManager>();
+        services.AddSingleton<ISlotSeedCache, FileSlotSeedCache>();
+        services.AddSingleton<ISlotProcessMonitor, SlotProcessMonitor>();
+        services.AddSingleton<SlotSeedCacheUpdater>();
         services.AddSingleton<ISlotInitialiser, SlotInitialiser>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton(provider => provider.GetRequiredService<ISettingsService>().Load());

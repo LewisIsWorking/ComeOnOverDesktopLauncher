@@ -6,8 +6,20 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 
 /// <summary>
 /// Seeds a Claude slot with login credentials on first use.
-/// Primary source: the default Claude profile at %APPDATA%\Claude.
-/// Fallback: any other already-seeded slot.
+///
+/// Seeding order, each step attempted only if earlier steps failed:
+/// 1. <see cref="ISlotSeedCache"/> - a launcher-maintained snapshot of
+///    (Cookies + Local State + Preferences) from a previously-closed slot.
+///    This is the most reliable source because the files are always unlocked
+///    and the Local State provides the matching Chromium encryption key.
+/// 2. The default Claude profile at %APPDATA%\Claude (Cookies only).
+/// 3. Any other already-seeded slot's Cookies.
+///
+/// Options 2 and 3 copy only Cookies. Those paths rely on the new slot
+/// generating its own Local State on first launch; the encryption key will
+/// therefore not match the copied cookies and login will usually fail. They
+/// remain as a last resort for when the seed cache has never been populated
+/// (e.g. a fresh install of the launcher).
 ///
 /// Chromium keeps the cookies SQLite file open while Claude is running, so copies
 /// are attempted with <see cref="IFileSystem.CopyFileSharedRead"/> (FileShare.ReadWrite).
@@ -36,15 +48,20 @@ public class SlotInitialiser : ISlotInitialiser
 
     private readonly IFileSystem _fileSystem;
     private readonly ILoggingService _logger;
+    private readonly ISlotSeedCache _seedCache;
 
     private static readonly string DefaultCookiesPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Claude", "Network", "Cookies");
 
-    public SlotInitialiser(IFileSystem fileSystem, ILoggingService logger)
+    public SlotInitialiser(
+        IFileSystem fileSystem,
+        ILoggingService logger,
+        ISlotSeedCache seedCache)
     {
         _fileSystem = fileSystem;
         _logger = logger;
+        _seedCache = seedCache;
     }
 
     public bool IsSeeded(LaunchSlot slot)
@@ -63,13 +80,20 @@ public class SlotInitialiser : ISlotInitialiser
         }
 
         _logger.LogInfo($"Seeding slot {slot.SlotNumber}");
+
+        if (_seedCache.TrySeed(slot))
+        {
+            _logger.LogInfo($"Slot {slot.SlotNumber} seeded from seed cache");
+            return;
+        }
+
         var networkDir = GetSlotNetworkDir(slot);
         _fileSystem.CreateDirectory(networkDir);
         var destination = GetSlotCookiesPath(slot);
 
         if (TryCopyAndVerify(DefaultCookiesPath, destination))
         {
-            _logger.LogInfo($"Slot {slot.SlotNumber} seeded from default Claude profile");
+            _logger.LogInfo($"Slot {slot.SlotNumber} seeded from default Claude profile (Cookies only)");
             return;
         }
 
@@ -80,7 +104,7 @@ public class SlotInitialiser : ISlotInitialiser
             if (!IsSeeded(fallbackSlot)) continue;
             if (TryCopyAndVerify(GetSlotCookiesPath(fallbackSlot), destination))
             {
-                _logger.LogInfo($"Slot {slot.SlotNumber} seeded from fallback slot {i}");
+                _logger.LogInfo($"Slot {slot.SlotNumber} seeded from fallback slot {i} (Cookies only)");
                 return;
             }
         }

@@ -10,7 +10,8 @@ public class SlotInitialiserTests
 {
     private readonly IFileSystem _fileSystem = Substitute.For<IFileSystem>();
     private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
-    private SlotInitialiser CreateSut() => new(_fileSystem, _logger);
+    private readonly ISlotSeedCache _seedCache = Substitute.For<ISlotSeedCache>();
+    private SlotInitialiser CreateSut() => new(_fileSystem, _logger, _seedCache);
     private readonly LaunchSlot _slot = new(1);
 
     private static readonly byte[] ValidSqliteHeader =
@@ -166,5 +167,42 @@ public class SlotInitialiserTests
             .Throw(new IOException("locked"));
 
         Assert.Null(Record.Exception(() => CreateSut().EnsureInitialised(_slot)));
+    }
+
+    [Fact]
+    public void EnsureInitialised_WhenSeedCacheCanSeed_UsesCacheAndSkipsOtherSources()
+    {
+        _fileSystem.FileExists(SlotCookiesPath).Returns(false);
+        _seedCache.TrySeed(_slot).Returns(true);
+
+        CreateSut().EnsureInitialised(_slot);
+
+        _seedCache.Received(1).TrySeed(_slot);
+        _fileSystem.DidNotReceive().CopyFileSharedRead(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public void EnsureInitialised_WhenSeedCacheFails_FallsThroughToDefaultProfile()
+    {
+        _fileSystem.FileExists(SlotCookiesPath).Returns(false);
+        _fileSystem.FileExists(DefaultCookiesPath).Returns(true);
+        _fileSystem.ReadFileHeader(SlotCookiesPath, 16).Returns(ValidSqliteHeader);
+        _seedCache.TrySeed(_slot).Returns(false);
+
+        CreateSut().EnsureInitialised(_slot);
+
+        _seedCache.Received(1).TrySeed(_slot);
+        _fileSystem.Received(1).CopyFileSharedRead(DefaultCookiesPath, SlotCookiesPath);
+    }
+
+    [Fact]
+    public void EnsureInitialised_WhenAlreadySeeded_DoesNotConsultSeedCache()
+    {
+        _fileSystem.FileExists(SlotCookiesPath).Returns(true);
+        _fileSystem.GetFileSize(SlotCookiesPath).Returns(36864L);
+
+        CreateSut().EnsureInitialised(_slot);
+
+        _seedCache.DidNotReceive().TrySeed(Arg.Any<LaunchSlot>());
     }
 }
