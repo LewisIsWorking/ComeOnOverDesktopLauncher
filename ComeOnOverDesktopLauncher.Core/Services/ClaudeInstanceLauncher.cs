@@ -67,8 +67,15 @@ public class ClaudeInstanceLauncher : IClaudeInstanceLauncher
         _logger.LogInfo($"Starting process: {exePath} {args}");
         try
         {
-            _processService.Start(exePath, args);
-            _logger.LogInfo($"Process.Start completed for slot {slot.SlotNumber}");
+            // Log callback captures slot.SlotNumber (always available)
+            // rather than pid (would be a race with the background
+            // reader thread that BeginErrorReadLine spawns). PID lands
+            // in the "completed" log line below so correlation is
+            // still possible via slot+time.
+            var pid = _processService.StartWithStderrPipe(
+                exePath, args,
+                line => _logger.LogWarning($"[claude slot {slot.SlotNumber} stderr] {line}"));
+            _logger.LogInfo($"Process.Start completed for slot {slot.SlotNumber} (pid {pid})");
         }
         catch (Exception ex)
         {

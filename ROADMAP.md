@@ -106,6 +106,37 @@
 - [x] **`Copy window screenshot to clipboard` button** - shipped in v1.7.3 using Avalonia 12's `RenderTargetBitmap.Render(visual)` + `ClipboardExtensions.SetBitmapAsync` (not GDI) - rendering the visual tree directly gives reliable results regardless of window state (maximised, partially covered, off-screen) that the original GDI `CopyFromScreen` approach would have struggled with. Image lands on the clipboard in every relevant Windows format simultaneously (`image/png`, `PNG`, `DeviceIndependentBitmap`, `Format17`, `Bitmap`) so it pastes into Slack/Discord/Word/Paint without fuss.
 - [x] 229 tests passing (up from 162 in v1.7.1), zero warnings, zero errors
 
+## v1.8.3 - Released
+
+Behaviour-only release - no UI change, so the v1.8.2 screenshot still represents the UI accurately.
+
+### Route Claude Desktop stderr into CoODL's diagnostic log
+
+- [x] **New `IProcessService.StartWithStderrPipe(fileName, arguments, onStderrLine)`** method. `SystemProcessService` redirects the child's stderr stream and pipes each line to the supplied callback via `BeginErrorReadLine`. The process handle is disposed on exit so we don't leak across many launches.
+- [x] **`ClaudeInstanceLauncher.LaunchSlot`** now calls `StartWithStderrPipe` with a callback that forwards each line through `ILoggingService.LogWarning` tagged `[claude slot N stderr]`. The callback captures `slot.SlotNumber` (always available at capture time), not `pid` - capturing `pid` would race the background reader thread that `BeginErrorReadLine` spawns, and the first stderr line could arrive before the assignment completed.
+- [x] **Only stderr is redirected, not stdout.** `.NET`'s paired `BeginOutputReadLine` + `BeginErrorReadLine` can deadlock in edge cases where one stream's reader blocks while the other fills its buffer. Claude rarely prints to stdout, and we only care about deprecation warnings + IPC errors, which all go to stderr. Single-stream capture is safer.
+
+### Upstream issue catalogue
+
+- [x] **New `docs/dev/UPSTREAM-CLAUDE-DESKTOP-BUGS.md`** documents four Claude-internal issues surfaced via `--trace-deprecation`, with call-site offsets and suggested upstream fixes:
+    - **DEP0040** - some dep in `index.pre.js` still calls `require('punycode')`; clock is ticking before Node removes the built-in.
+    - **DEP0169** - `Sle.request(...)` inside `index.pre.js` calls `url.parse()`; Node explicitly says no CVEs will be issued for `url.parse` security bugs.
+    - **BuddyBleTransport.reportState** - renderer emits an IPC message with no registered handler on the main process. BLE-buddy feature may be silently broken.
+    - **MaxListenersExceededWarning** on minified class `RAr` - possible listener leak.
+- [x] All four are Claude-internal - CoODL cannot patch them - but they're now preserved in our own log, tagged, and catalogued for when Anthropic asks "how did you hit that?".
+
+### Why route-to-log is not suppression
+
+Lewis set the rule explicitly: NEVER SUPPRESS. The four warnings above are real issues with real consequences (`punycode` removal will break Claude on future Node majors; `url.parse` is an ongoing security footgun; BuddyBle may indicate a broken feature; MaxListeners may indicate a leak). Hiding them would be dishonest.
+
+The v1.8.3 behaviour is not suppression - it is *routing*. Before v1.8.3: warnings were emitted to stderr, inherited into whatever parent process spawned CoODL (a terminal in dev, nothing in prod). They were ephemeral and only visible if you happened to be watching. After v1.8.3: warnings are captured into `launcher-YYYY-MM-DD.log` alongside every other diagnostic entry, tagged with the slot number that produced them, timestamped, and reviewable forever. Strictly more information, not less.
+
+### Numbers
+
+- 243 tests passing (unchanged from v1.8.2; no new tests because `SystemProcessService` follows the existing pattern of being tested by proxy through the `IProcessService` mock).
+- 0 warnings, 0 errors.
+- All files still ≤ 200 lines (verified via `FileSizeLimitTests` CI guard).
+
 ## v1.8.2 - Released
 
 ![v1.8.2 UI](docs/screenshots/photo_2026-04-19_v1.8.2.png)

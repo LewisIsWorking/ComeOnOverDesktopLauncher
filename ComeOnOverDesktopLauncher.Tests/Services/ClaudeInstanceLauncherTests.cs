@@ -23,9 +23,10 @@ public class ClaudeInstanceLauncherTests
 
         CreateSut().LaunchSlot(new LaunchSlot(1));
 
-        _processService.Received(1).Start(
+        _processService.Received(1).StartWithStderrPipe(
             @"C:\claude.exe",
-            Arg.Is<string>(a => a.Contains("ClaudeSlot1")));
+            Arg.Is<string>(a => a.Contains("ClaudeSlot1")),
+            Arg.Any<Action<string>>());
     }
 
     [Fact]
@@ -93,8 +94,14 @@ public class ClaudeInstanceLauncherTests
 
         CreateSut().LaunchInstances(2);
 
-        _processService.Received(1).Start(@"C:\claude.exe", Arg.Is<string>(a => a.Contains("ClaudeSlot1")));
-        _processService.Received(1).Start(@"C:\claude.exe", Arg.Is<string>(a => a.Contains("ClaudeSlot2")));
+        _processService.Received(1).StartWithStderrPipe(
+            @"C:\claude.exe",
+            Arg.Is<string>(a => a.Contains("ClaudeSlot1")),
+            Arg.Any<Action<string>>());
+        _processService.Received(1).StartWithStderrPipe(
+            @"C:\claude.exe",
+            Arg.Is<string>(a => a.Contains("ClaudeSlot2")),
+            Arg.Any<Action<string>>());
     }
 
     [Fact]
@@ -117,7 +124,8 @@ public class ClaudeInstanceLauncherTests
         _slotManager.GetNextFreeSlots(Arg.Any<int>()).Returns([slot]);
         var callOrder = new List<string>();
         _slotInitialiser.When(s => s.EnsureInitialised(slot)).Do(_ => callOrder.Add("init"));
-        _processService.When(p => p.Start(Arg.Any<string>(), Arg.Any<string>()))
+        _processService.When(p => p.StartWithStderrPipe(
+                Arg.Any<string>(), Arg.Any<string>(), Arg.Any<Action<string>>()))
             .Do(_ => callOrder.Add("launch"));
 
         CreateSut().LaunchInstances(1);
