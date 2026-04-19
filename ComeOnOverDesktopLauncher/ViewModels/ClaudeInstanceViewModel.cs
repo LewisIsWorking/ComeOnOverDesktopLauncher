@@ -20,7 +20,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 /// genuinely want to blank the thumbnail use <see cref="ClearThumbnail"/>.
 /// </para>
 /// </summary>
-public partial class ClaudeInstanceViewModel : ObservableObject
+public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableViewModel
 {
     private readonly Action<int, string>? _onNameChanged;
     private readonly Action<int>? _onKill;

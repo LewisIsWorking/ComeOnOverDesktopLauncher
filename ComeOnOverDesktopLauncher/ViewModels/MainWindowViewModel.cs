@@ -126,13 +126,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     // When the user toggles the "Show thumbnails" checkbox the
     // ThumbnailRefresher handles settings persistence + clearing stale
-    // captures if the toggle went off. See ThumbnailRefresher.HandleToggleChange
-    // for the full rationale (including why v1.9.0 only covers slot
-    // collections and externals join in v1.9.1).
+    // captures if the toggle went off. v1.9.1 extended this to include
+    // external instances now that they share IThumbnailableViewModel
+    // with slot instances.
     partial void OnThumbnailsEnabledChanged(bool value) =>
         ThumbnailRefresher.HandleToggleChange(
             value, _settings, SaveSettings,
-            SlotInstances.Items, SlotInstances.TrayItems);
+            SlotInstances.Items.Cast<IThumbnailableViewModel>()
+                .Concat(ExternalInstances.Items.Cast<IThumbnailableViewModel>()),
+            SlotInstances.TrayItems);
 
     [RelayCommand]
     private void LaunchInstances()
@@ -178,10 +180,10 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (ThumbnailsEnabled)
         {
-            // v1.9.0 covers slot thumbnails only. External instances
-            // will join in v1.9.1 alongside the grid card migration.
             ThumbnailRefresher.RefreshVisibleThumbnails(
                 _thumbnailService, SlotInstances.Items, 240, 150);
+            ThumbnailRefresher.RefreshVisibleThumbnails(
+                _thumbnailService, ExternalInstances.Items, 240, 150);
         }
     }
 

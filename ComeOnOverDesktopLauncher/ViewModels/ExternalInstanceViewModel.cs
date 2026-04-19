@@ -1,3 +1,4 @@
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ComeOnOverDesktopLauncher.Core.Models;
@@ -15,7 +16,7 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 /// per-row instances stay free of service dependencies and remain
 /// trivially unit-testable.
 /// </summary>
-public partial class ExternalInstanceViewModel : ObservableObject
+public partial class ExternalInstanceViewModel : ObservableObject, IThumbnailableViewModel
 {
     /// <summary>
     /// Longest command-line display before middle-ellipsis truncation.
@@ -31,6 +32,15 @@ public partial class ExternalInstanceViewModel : ObservableObject
     /// (rows are removed from the parent collection when the PID exits).
     /// </summary>
     public int Pid { get; }
+
+    /// <summary>
+    /// <see cref="IThumbnailableViewModel.ProcessId"/> alias exposing
+    /// <see cref="Pid"/> under the shared interface name. Avoids
+    /// renaming the existing <c>Pid</c> property (which is bound from
+    /// XAML) while still letting this VM slot into the common
+    /// thumbnail pipeline alongside <see cref="ClaudeInstanceViewModel"/>.
+    /// </summary>
+    public int ProcessId => Pid;
 
     /// <summary>Full command line as reported by WMI. Shown in tooltips
     /// and in the close-confirmation dialog so the user can decide
@@ -50,6 +60,7 @@ public partial class ExternalInstanceViewModel : ObservableObject
     [ObservableProperty] private double _cpuPercent;
     [ObservableProperty] private double _ramMb;
     [ObservableProperty] private TimeSpan _uptime;
+    [ObservableProperty] private Bitmap? _thumbnail;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(CloseCommand))]
@@ -99,6 +110,34 @@ public partial class ExternalInstanceViewModel : ObservableObject
     }
 
     private bool CanClose() => !IsClosing;
+
+    /// <summary>
+    /// Replaces <see cref="Thumbnail"/> with a new bitmap decoded from
+    /// the supplied PNG bytes. A null or empty array is a no-op, not
+    /// a clear - matches the frozen-thumbnail contract defined on
+    /// <see cref="IThumbnailableViewModel"/>. Previous bitmap is
+    /// disposed when replaced so we don't leak GDI handles over long
+    /// launcher uptimes.
+    /// </summary>
+    public void UpdateThumbnailFromBytes(byte[]? pngBytes)
+    {
+        if (pngBytes is null || pngBytes.Length == 0) return;
+        var old = Thumbnail;
+        using var ms = new MemoryStream(pngBytes);
+        Thumbnail = new Bitmap(ms);
+        old?.Dispose();
+    }
+
+    /// <summary>
+    /// Explicitly blanks the thumbnail and disposes its buffer. Called
+    /// when the user toggles the "Show thumbnails" setting off.
+    /// </summary>
+    public void ClearThumbnail()
+    {
+        var old = Thumbnail;
+        Thumbnail = null;
+        old?.Dispose();
+    }
 
     /// <summary>
     /// Builds the inline display string. Order of operations:

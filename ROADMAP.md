@@ -106,6 +106,37 @@
 - [x] **`Copy window screenshot to clipboard` button** - shipped in v1.7.3 using Avalonia 12's `RenderTargetBitmap.Render(visual)` + `ClipboardExtensions.SetBitmapAsync` (not GDI) - rendering the visual tree directly gives reliable results regardless of window state (maximised, partially covered, off-screen) that the original GDI `CopyFromScreen` approach would have struggled with. Image lands on the clipboard in every relevant Windows format simultaneously (`image/png`, `PNG`, `DeviceIndependentBitmap`, `Format17`, `Bitmap`) so it pastes into Slack/Discord/Word/Paint without fuss.
 - [x] 229 tests passing (up from 162 in v1.7.1), zero warnings, zero errors
 
+## v1.9.1 - Released
+
+![v1.9.1 UI](docs/screenshots/photo_2026-04-19_v1.9.1.png)
+
+Second of three incremental releases in the card/thumbnail series. v1.9.1 completes the visual migration: the row-based instance lists are replaced with a WrapPanel grid of full-size cards, and external Claude instances join the thumbnail pipeline alongside launcher-managed slots. v1.9.2 will add the click-to-enlarge preview.
+
+### Grid card layout
+
+- [x] **Three new UserControls** - `SlotCard.axaml`, `TrayCard.axaml`, `ExternalCard.axaml` - each rendering one row's worth of state in a 256px-wide card with a 240x150 thumbnail at the top, pills + metadata in the middle, and the CPU/RAM/uptime/action row at the bottom. Each card has a single clear responsibility so future evolution (drag-to-reorder, per-card context menus, click-to-enlarge) has a clean home.
+- [x] **WrapPanel grid** - all three list controls (`SlotInstanceList`, `TrayInstanceList`, `ExternalInstanceList`) now use an `ItemsPanelTemplate` with a horizontal `WrapPanel` containing the appropriate card host. On default window widths the grid tiles cleanly to 2 columns; narrow windows collapse to a single column automatically without any explicit breakpoint logic.
+- [x] **TrayCard "Hidden" overlay** - tray-resident slots show their last-captured thumbnail at 0.6 opacity with a "Hidden" badge in the top-right corner, communicating stale / frozen state at a glance. Read-only italic nickname (you cannot usefully edit a name for a slot whose window is gone) and a "Quit" button (force-kill, no confirm dialog - there is no visible window whose unsaved state to protect).
+- [x] **ExternalCard de-emphasised style** - grayer border (#2A2A2A), darker background (#151515), thumbnail at 0.85 opacity, muted foreground. Visually says "I didn't launch this, you did" without being visually dominant.
+
+### Externals join the thumbnail pipeline
+
+- [x] **New `IThumbnailableViewModel` interface** - shared surface (`ProcessId`, `Thumbnail`, `UpdateThumbnailFromBytes`, `ClearThumbnail`) implemented by both `ClaudeInstanceViewModel` and `ExternalInstanceViewModel`. Lets `ThumbnailRefresher` treat both row types uniformly without imposing a common base class.
+- [x] **`ExternalInstanceViewModel` gains thumbnail support** - same observable `Thumbnail` property, same no-op-on-null contract for `UpdateThumbnailFromBytes` (frozen-thumbnail behaviour applies to externals that go to tray too), same `ClearThumbnail` for explicit blank on toggle-off. Adds a `ProcessId => Pid` alias so the interface name matches without renaming the existing XAML-bound `Pid` property.
+- [x] **`MainWindowViewModel.RefreshResources` captures externals** - the `ThumbnailsEnabled` gate now loops over both `SlotInstances.Items` and `ExternalInstances.Items` in the poll tick. `OnThumbnailsEnabledChanged` extends the toggle-off clear to cover externals too.
+
+### Small-but-nice details
+
+- [x] **Thumbnails bound to `IImage`** via the `Bitmap?` property - same pattern as v1.9.0, unchanged. The UI-layer materialisation (bytes -> Bitmap) stays in the VM so Core still has zero Avalonia references.
+- [x] **TrayCard still shares `ClaudeInstanceViewModel`** with `SlotCard` - no duplicated VM state, just a different view template. The "Hidden" overlay is XAML-only because the underlying data (a tray-resident slot) doesn't need new properties to tell the story.
+- [x] **ExternalCard's close button still goes through the confirm dialog** owned by `ExternalInstanceListViewModel` - the `CloseCommand` binding and its dialog flow survived the card migration unchanged.
+
+### Numbers
+
+- 247 tests passing, unchanged from v1.9.0 - no new behaviour needed test coverage (the VM lifecycle is the same; only the view template moved). `ThumbnailRefresher` was verified by proxy through existing `MainWindowViewModel` tests that still pass.
+- 0 warnings, 0 errors.
+- All files stay <= 200 lines; `ExternalInstanceViewModel` grew from 153 to 184 lines with the thumbnail additions, still comfortably under.
+
 ## v1.9.0 - Released
 
 ![v1.9.0 UI](docs/screenshots/photo_2026-04-19_v1.9.0.png)

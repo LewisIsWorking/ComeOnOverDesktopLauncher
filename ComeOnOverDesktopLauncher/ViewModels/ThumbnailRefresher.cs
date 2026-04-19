@@ -30,7 +30,7 @@ public static class ThumbnailRefresher
     /// </summary>
     public static void RefreshVisibleThumbnails(
         IWindowThumbnailService service,
-        IEnumerable<ClaudeInstanceViewModel> visible,
+        IEnumerable<IThumbnailableViewModel> visible,
         int width,
         int height)
     {
@@ -48,7 +48,7 @@ public static class ThumbnailRefresher
     /// after the feature has been disabled.
     /// </summary>
     public static void ClearAllThumbnails(
-        params IEnumerable<ClaudeInstanceViewModel>[] collections)
+        params IEnumerable<IThumbnailableViewModel>[] collections)
     {
         foreach (var collection in collections)
             foreach (var vm in collection)
@@ -74,8 +74,8 @@ public static class ThumbnailRefresher
         bool enabled,
         Core.Models.AppSettings settings,
         Action saveSettings,
-        IEnumerable<ClaudeInstanceViewModel> items,
-        IEnumerable<ClaudeInstanceViewModel> trayItems)
+        IEnumerable<IThumbnailableViewModel> items,
+        IEnumerable<IThumbnailableViewModel> trayItems)
     {
         settings.ThumbnailsEnabled = enabled;
         saveSettings();
