@@ -106,6 +106,38 @@
 - [x] **`Copy window screenshot to clipboard` button** - shipped in v1.7.3 using Avalonia 12's `RenderTargetBitmap.Render(visual)` + `ClipboardExtensions.SetBitmapAsync` (not GDI) - rendering the visual tree directly gives reliable results regardless of window state (maximised, partially covered, off-screen) that the original GDI `CopyFromScreen` approach would have struggled with. Image lands on the clipboard in every relevant Windows format simultaneously (`image/png`, `PNG`, `DeviceIndependentBitmap`, `Format17`, `Bitmap`) so it pastes into Slack/Discord/Word/Paint without fuss.
 - [x] 229 tests passing (up from 162 in v1.7.1), zero warnings, zero errors
 
+## v1.8.2 - Released
+
+![v1.8.2 UI](docs/screenshots/photo_2026-04-19_v1.8.2.png)
+
+This release is mostly invisible to end users - it's a structural cleanup release that eliminates technical debt and adds two new identity features. But the structural work unblocks faster feature delivery afterwards.
+
+### New features
+- [x] **"Slot N" identity pill** on every launcher-managed slot row. Previously the only identifier was the editable nickname (defaulting to "Instance N"), which conflated *identity* (which ClaudeSlotN data directory the instance uses) with *naming* (user-chosen label like "Work" or "Personal"). The pill now carries the identity explicitly and the nickname textbox becomes a proper free-text label. Slot number comes from the real `--user-data-dir=...\ClaudeSlotN` cmdline match so it's always accurate even when slots are opened out of order.
+- [x] **Tray-resident slot detection and surfacing.** Slots that have been close-to-tray'd (window hidden, process tree still alive, still counting toward Total RAM) now appear in a new "Hidden / tray" section below the visible slot list. Before v1.8.2 these vanished from the launcher entirely because the scanner's windowed-only filter (`MainWindowHandle != 0`) suppressed them, leaving the user to hunt for them in the system tray icon stack.
+    - New `ClaudeProcessInfo.IsWindowed` property on the core model.
+    - New `SlotProcessInfo.IsTrayResident` propagated from `!IsWindowed` at classification time.
+    - Scanner filter changed from "is windowed" to "is main process" (parent is not another claude.exe). This correctly includes tray-resident main processes while still excluding the ~10 Electron child processes per slot.
+    - `SlotInstanceListViewModel` split into `Items` (visible) + `TrayItems` (tray-resident) collections; reconciliation runs on both in parallel. Slots transition cleanly between collections when close-to-tray'd or restored.
+    - New `TrayInstanceList.axaml` UserControl renders the hidden section with read-only nickname (can't usefully edit the name of a slot you can't see) and a "Quit" button that force-kills the process tree (no confirm dialog - the slot has no visible window whose state could be lost).
+
+### Structural cleanup
+- [x] **Six files brought back under the 200-line limit.** The hard rule from the project's LEARNINGS.md is "≤200 lines per file, extract via OOP when a file grows past", but six files had drifted over during v1.7.x / v1.8.0 development and nobody (including Claude) noticed until an audit for this release.
+    - `MainWindow.axaml` (301 lines) → split into 5 UserControls: `LaunchControlsPanel`, `ResourceTotalsRow`, `SlotInstanceList`, `TrayInstanceList` (new), `ExternalInstanceList`. MainWindow is now a 55-line thin composition of these controls. The Copy Screenshot button moved from an inline `Click=` handler in MainWindow to a `RoutedEvent` exposed by `ResourceTotalsRow` - the UserControl can't capture the parent window itself, so it raises `CopyClicked` and MainWindow's code-behind handles it (where the window reference is available).
+    - `FileSlotSeedCache.cs` (219 lines) → validation helpers extracted into `SeedCacheValidators` (pure functions for SQLite-header check + Local State encrypted-key presence check). FSSC now at 188 lines and focused on IO orchestration.
+    - Four oversized test files split into fixture + scenario-focused classes: `MainWindowViewModelTests` (208 → 3 files), `SlotInstanceListViewModelTests` (222 → fixture + filter + lifecycle + tray), `ExternalInstanceListViewModelTests` (242 → fixture + refresh + close), `SlotInitialiserTests` (219 → fixture + source ordering + fallback).
+
+### CI guard against regression
+- [x] **New `FileSizeLimitTests.NoCodeFileExceedsTwoHundredLines`** test enumerates every `.cs` and `.axaml` file in the solution and fails `dotnet test` if any exceeds 200 lines. The GitHub Actions release workflow runs `dotnet test`, so any future PR that reintroduces an oversized file will fail CI before it can merge. Prevents the silent debt accumulation we just cleaned up.
+
+### Learnings followed from `docs/dev/LEARNINGS.md`
+The NSubstitute-import gotcha (every new test file needs `using NSubstitute;` explicitly), the Avalonia compiled-XAML UserControl split pattern (`x:DataType` on the UserControl + `x:Name` not `Name=` + RoutedEvent pattern for code-behind handlers), and the `start_process` working-directory drift were all documented in LEARNINGS before this release. Still hit them during the refactor anyway - the new session-start rule is to read LEARNINGS first, always.
+
+### Numbers
+- 243 tests passing (up from 229 - +14 new: 6 `ClaudeProcessMainIdentifier`, 7 slot tray behaviour, 1 CI guard).
+- 0 warnings, 0 errors.
+- Every `.cs` / `.axaml` file now ≤ 200 lines.
+
 ## v1.8.1 - Released
 
 ![v1.8.1 UI](docs/screenshots/photo_2026-04-18_v1.8.1.png)
@@ -133,6 +165,14 @@
 - [ ] Ads will never appear in v1.x - planned for a later major version once the user base is established
 
 ## Backlog / Under Consideration
+- [ ] **Shared extension store across slots** — each `ClaudeSlot{N}\Claude Extensions\` is currently a separate copy of the extension tree, so installing a 2 GB extension like Desktop Commander N times burns N × 2 GB of disk and N × download time. CoODL could maintain a single shared `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\extensions\{extension-id}\` store and, on slot initialisation, create junction points (symlinks) from each slot's `Claude Extensions\{extension-id}\` into the shared store. Claude would see a normal-looking folder; changes written via one slot would propagate to all. Risks: per-slot configuration divergence if an extension writes config into its own install dir (most don't — config typically lives in the slot's `claude_desktop_config.json`), and Claude might not handle the junction points gracefully on auto-update (need to test). Worth a spike-and-evaluate investigation.
+
+- [ ] **Per-slot activity preview** — surface what each slot is doing at a glance so you don't have to alt-tab to remember. Open design questions before building:
+    - **Thumbnail approach** (visual): periodically capture each slot's window via `PrintWindow`, downscale to 160x120, show under each row. Privacy win: no content parsing. Privacy loss: any text on the capture is readable if someone shoulder-surfs the launcher. Cost: ~20 ms per slot per capture, one capture every 30-60 s is plenty.
+    - **Metadata approach** (textual): tail the latest message or active-tool indicator from Claude's local state store. Lower visual density but more useful at tiny sizes. Privacy concern much worse (the launcher would be reading conversation content), would need strict opt-in. Also depends on Claude's storage format being stable, which it isn't.
+    - **Activity-signal approach** (minimal): show renderer CPU %, node-service CPU % (MCP activity), and last-interacted timestamp per slot. Zero content exposure, fast, survives Claude storage-format changes. Less "at a glance what is Slot 3 doing" but answers "is Slot 3 busy?" which is the common need.
+    - Likely lands as a combo: activity signal always visible + optional thumbnail behind a settings toggle (off by default). Thumbnails stored in-memory only, never written to disk. Would want a "pause captures while on battery" option for laptop users.
+
 - [ ] Auto-update mechanism for the launcher itself (Squirrel.Windows / Sparkle)
 - [ ] Submit to awesome-avalonia list
 - [ ] Reddit / HN launch post

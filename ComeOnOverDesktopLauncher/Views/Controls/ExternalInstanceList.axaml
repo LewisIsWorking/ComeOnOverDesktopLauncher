@@ -1,0 +1,90 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ComeOnOverDesktopLauncher.ViewModels"
+             x:Class="ComeOnOverDesktopLauncher.Views.Controls.ExternalInstanceList"
+             x:DataType="vm:MainWindowViewModel">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Border IsVisible="{Binding ExternalInstances.HasExternalInstances}"
+            BorderThickness="0,1,0,0" BorderBrush="#444"
+            Margin="0,10,0,0" Padding="0,10,0,0">
+        <StackPanel Spacing="8">
+
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="External Claude instances"
+                           FontSize="11" FontWeight="SemiBold"
+                           Foreground="Gray"
+                           VerticalAlignment="Center"
+                           ToolTip.Tip="Claude windows running on this system that were NOT started by the launcher (e.g. default-profile Claude launched from the Start menu)."/>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding ExternalInstances.TotalRamMb, StringFormat='{}{0} MB'}"
+                           FontSize="10" Foreground="Gray"
+                           Margin="0,0,8,0"
+                           VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="2"
+                           Text="{Binding ExternalInstances.TotalCpuPercent, StringFormat='{}{0}%'}"
+                           FontSize="10" Foreground="Gray"
+                           VerticalAlignment="Center"/>
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding ExternalInstances.Items}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:ExternalInstanceViewModel">
+                        <Border BorderThickness="0,0,0,1" BorderBrush="#2A2A2A" Padding="0,6">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Pid, StringFormat='PID {0}'}"
+                                           FontSize="10" Foreground="Gray"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding CommandLineDisplay}"
+                                           FontSize="11"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center"
+                                           ToolTip.Tip="{Binding CommandLine}"/>
+
+                                <StackPanel Grid.Column="2" HorizontalAlignment="Center" Margin="6,0">
+                                    <TextBlock Text="CPU" FontSize="9" Foreground="Gray" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding CpuPercent, StringFormat='{}{0}%'}"
+                                               FontSize="11" HorizontalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="3" HorizontalAlignment="Center" Margin="6,0">
+                                    <TextBlock Text="RAM" FontSize="9" Foreground="Gray" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding RamMb, StringFormat='{}{0} MB'}"
+                                               FontSize="11" HorizontalAlignment="Center"/>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="4" HorizontalAlignment="Center" Margin="6,0">
+                                    <TextBlock Text="Up" FontSize="9" Foreground="Gray" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding UptimeDisplay}"
+                                               FontSize="11" HorizontalAlignment="Center"/>
+                                </StackPanel>
+
+                                <Button Grid.Column="5"
+                                        Content="X"
+                                        Command="{Binding CloseCommand}"
+                                        Foreground="#EF9A9A"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        FontSize="12"
+                                        FontWeight="SemiBold"
+                                        Padding="8,4"
+                                        Margin="6,0,0,0"
+                                        VerticalAlignment="Center"
+                                        HorizontalAlignment="Center"
+                                        ToolTip.Tip="Close this external Claude (asks for confirmation first)"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Border>
+</UserControl>

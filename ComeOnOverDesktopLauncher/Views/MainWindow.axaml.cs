@@ -3,6 +3,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using ComeOnOverDesktopLauncher.Services.Interfaces;
 using ComeOnOverDesktopLauncher.ViewModels;
+using ComeOnOverDesktopLauncher.Views.Controls;
 
 namespace ComeOnOverDesktopLauncher.Views;
 
@@ -18,6 +19,15 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // The Copy screenshot button lives inside the ResourceTotalsRow
+        // UserControl. The UserControl doesn't own the Window reference
+        // needed to capture it, so it raises a CopyClicked event we
+        // subscribe to here. Split out from the inline Click=... handler
+        // in v1.8.2 when MainWindow.axaml was decomposed into UserControls.
+        var totalsRow = this.FindControl<ResourceTotalsRow>("TotalsRow");
+        if (totalsRow is not null)
+            totalsRow.CopyClicked += OnCopyScreenshotClick;
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)

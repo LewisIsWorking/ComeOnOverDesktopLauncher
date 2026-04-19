@@ -1,5 +1,3 @@
-using System.Text;
-using System.Text.Json;
 using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 
@@ -19,15 +17,16 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// The filename "LocalState" is used (without the space) because we treat it
 /// as an internal artefact; when we write it back to a target slot we use
 /// Chromium's expected name "Local State".
+///
+/// Pure validation logic (SQLite header check, Local State encrypted-key
+/// presence check) lives in <see cref="SeedCacheValidators"/> so this
+/// file stays focused on the IO-orchestration concern.
 /// </summary>
 public class FileSlotSeedCache : ISlotSeedCache
 {
     internal const string CookiesFileName = "Cookies";
     internal const string LocalStateFileName = "LocalState";
     internal const string PreferencesFileName = "Preferences";
-
-    private static readonly byte[] SqliteMagic =
-        Encoding.ASCII.GetBytes("SQLite format 3\0");
 
     private readonly IFileSystem _fileSystem;
     private readonly ILoggingService _logger;
@@ -48,8 +47,8 @@ public class FileSlotSeedCache : ISlotSeedCache
         _fileSystem.FileExists(Path.Combine(_cacheDirectory, CookiesFileName)) &&
         _fileSystem.FileExists(Path.Combine(_cacheDirectory, LocalStateFileName)) &&
         _fileSystem.FileExists(Path.Combine(_cacheDirectory, PreferencesFileName)) &&
-        IsValidSqliteFile(Path.Combine(_cacheDirectory, CookiesFileName)) &&
-        HasEncryptedKey(Path.Combine(_cacheDirectory, LocalStateFileName));
+        SeedCacheValidators.IsValidSqliteFile(_fileSystem, Path.Combine(_cacheDirectory, CookiesFileName)) &&
+        SeedCacheValidators.HasEncryptedKey(_fileSystem, Path.Combine(_cacheDirectory, LocalStateFileName));
 
     public bool TrySnapshot(LaunchSlot source)
     {
@@ -64,7 +63,7 @@ public class FileSlotSeedCache : ISlotSeedCache
         _logger.LogInfo($"Snapshotting slot {source.SlotNumber} into seed cache");
 
         if (!TryCopySharedRead(srcCookies, dstCookies)) return false;
-        if (!IsValidSqliteFile(dstCookies))
+        if (!SeedCacheValidators.IsValidSqliteFile(_fileSystem, dstCookies))
         {
             _logger.LogWarning("Snapshot cookies failed SQLite header check - discarding");
             TryDelete(dstCookies);
@@ -76,7 +75,7 @@ public class FileSlotSeedCache : ISlotSeedCache
             TryDelete(dstCookies);
             return false;
         }
-        if (!HasEncryptedKey(dstLocalState))
+        if (!SeedCacheValidators.HasEncryptedKey(_fileSystem, dstLocalState))
         {
             _logger.LogWarning("Snapshot Local State missing os_crypt.encrypted_key - discarding");
             TryDelete(dstCookies);
@@ -144,36 +143,6 @@ public class FileSlotSeedCache : ISlotSeedCache
         catch (IOException ex)
         {
             _logger.LogWarning($"Snapshot copy from {source} failed: {ex.Message}");
-            return false;
-        }
-    }
-
-    private bool IsValidSqliteFile(string path)
-    {
-        var header = _fileSystem.ReadFileHeader(path, SqliteMagic.Length);
-        if (header.Length != SqliteMagic.Length) return false;
-        for (var i = 0; i < SqliteMagic.Length; i++)
-            if (header[i] != SqliteMagic[i]) return false;
-        return true;
-    }
-
-    private bool HasEncryptedKey(string localStatePath)
-    {
-        try
-        {
-            var json = _fileSystem.ReadAllText(localStatePath);
-            using var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("os_crypt", out var osCrypt)) return false;
-            if (!osCrypt.TryGetProperty("encrypted_key", out var key)) return false;
-            return key.ValueKind == JsonValueKind.String &&
-                   !string.IsNullOrWhiteSpace(key.GetString());
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
-        catch (IOException)
-        {
             return false;
         }
     }

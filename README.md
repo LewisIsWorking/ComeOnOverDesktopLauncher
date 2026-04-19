@@ -39,6 +39,9 @@ ComeOnOverDesktopLauncher.Tests/    # xUnit test suite (100% coverage)
 
 ## Development
 
+> **Contributing / LLM-assisted development:** read [`docs/dev/LEARNINGS.md`](docs/dev/LEARNINGS.md) first. It is the accumulated list of gotchas, hard rules, release checklist, and architectural invariants for this repo. Written for future sessions of Claude but useful for any contributor.
+
+
 - .NET 10, Avalonia 12, CommunityToolkit.Mvvm
 - SOLID principles, MVVM pattern throughout
 - 200-line file limit - extract to new files rather than growing existing ones

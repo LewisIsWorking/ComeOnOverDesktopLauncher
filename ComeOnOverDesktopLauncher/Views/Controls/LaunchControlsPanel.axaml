@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ComeOnOverDesktopLauncher.ViewModels"
+             x:Class="ComeOnOverDesktopLauncher.Views.Controls.LaunchControlsPanel"
+             x:DataType="vm:MainWindowViewModel">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <StackPanel Spacing="14">
+
+        <!-- Launch controls -->
+        <StackPanel Spacing="8" IsVisible="{Binding IsClaudeInstalled}">
+            <TextBlock Text="Additional instances to open:" FontSize="13"/>
+            <NumericUpDown Value="{Binding SlotCount}"
+                           Minimum="1" Maximum="10"
+                           FormatString="0"
+                           Width="120"
+                           HorizontalAlignment="Left"/>
+            <Button Content="Launch Claude"
+                    Command="{Binding LaunchInstancesCommand}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Claude not found warning -->
+        <StackPanel IsVisible="{Binding !IsClaudeInstalled}" Spacing="4">
+            <TextBlock Text="&#x26A0; Claude Desktop is not installed."
+                       Foreground="OrangeRed" FontSize="13"/>
+            <TextBlock Text="Download Claude Desktop from claude.ai/download to use this launcher."
+                       Foreground="Gray" FontSize="11" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Settings row -->
+        <StackPanel Orientation="Horizontal" Spacing="16">
+            <CheckBox Content="Launch on startup"
+                      IsChecked="{Binding LaunchOnStartup}"
+                      FontSize="12"
+                      VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                <TextBlock Text="Refresh interval:" FontSize="12" VerticalAlignment="Center"/>
+                <NumericUpDown Value="{Binding RefreshIntervalSeconds}"
+                               Minimum="1" Maximum="60"
+                               FormatString="0"
+                               Width="130"
+                               VerticalAlignment="Center"/>
+                <TextBlock Text="s" FontSize="12" VerticalAlignment="Center"/>
+                <TextBlock Text="[i]"
+                           FontSize="11"
+                           Foreground="Gray"
+                           VerticalAlignment="Center"
+                           Cursor="Help"
+                           ToolTip.Tip="How often the CPU, RAM and uptime stats refresh for each running Claude instance. Lower = more accurate but uses slightly more CPU. Recommended: 5s"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- Update available banner -->
+        <Border Background="#1A4CAF25" CornerRadius="4" Padding="10,6"
+                IsVisible="{Binding UpdateAvailableMessage, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding UpdateAvailableMessage}"
+                       Foreground="#4CAF50" FontSize="11"
+                       TextWrapping="Wrap"/>
+        </Border>
+
+    </StackPanel>
+</UserControl>

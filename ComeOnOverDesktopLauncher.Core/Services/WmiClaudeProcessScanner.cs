@@ -12,30 +12,31 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// WHERE Name='claude.exe'</c>) to read command lines, parent linkage,
 /// and process start times.
 ///
-/// <b>Windowed-only filter:</b> Claude is an Electron app; each running
+/// <b>Main-process filter:</b> Claude is an Electron app; each running
 /// Claude window spawns ~10 child processes (renderer, GPU, crashpad
-/// handler, audio/video/network utility services, node-service). To avoid
-/// flooding the UI with a row per child process, the scanner drops any
-/// PID whose <see cref="Process.MainWindowHandle"/> is zero. This matches
-/// the established <see cref="IProcessService.GetWindowedProcessSnapshots"/>
-/// convention.
+/// handler, audio/video/network utility services, node-service). To
+/// avoid flooding the UI with a row per child process, the scanner
+/// keeps only "main" processes - those whose parent is not also a
+/// claude.exe. See <see cref="ClaudeProcessMainIdentifier"/>.
+///
+/// <b>Windowed vs tray-resident:</b> Before v1.8.2 the scanner also
+/// filtered to <c>MainWindowHandle != 0</c>, but that dropped slots
+/// the user had close-to-tray'd (window hidden, process tree still
+/// alive). Now every main is returned, with <c>IsWindowed</c>
+/// reflecting window state so the view layer can split them into the
+/// visible-slot list vs the hidden/tray list.
 ///
 /// <b>Command-line enrichment:</b> Chromium/Electron's "browser main"
-/// process (the one with the visible window) reports an empty args list
-/// to WMI - its <c>--user-data-dir</c> flag is only copied into child
-/// processes during fork. Classification (slot vs external) needs that
-/// flag, so the scanner walks each windowed main's direct children via
+/// process reports an empty args list to WMI - its
+/// <c>--user-data-dir</c> flag is only copied into child processes
+/// during fork. Classification (slot vs external) needs that flag, so
+/// the scanner walks each main's direct children via
 /// <c>ParentProcessId</c> and, when the main's own cmdline is missing
 /// the flag, extracts <c>--user-data-dir=...</c> from any child and
-/// appends it. The result is a clean, minimal cmdline that still carries
-/// the one piece of information the classifier needs.
+/// appends it.
 ///
 /// WMI is currently the only reliable way to read another process's
-/// command line on Windows from managed code:
-/// <see cref="Process.StartInfo.Arguments"/> is only populated for
-/// processes we started ourselves, and the
-/// <c>NtQueryInformationProcess</c> + PEB-read alternative requires
-/// <c>SeDebugPrivilege</c>.
+/// command line on Windows from managed code.
 /// </summary>
 [SupportedOSPlatform("windows")]
 public class WmiClaudeProcessScanner : IClaudeProcessScanner
@@ -51,22 +52,29 @@ public class WmiClaudeProcessScanner : IClaudeProcessScanner
 
     public IReadOnlyList<ClaudeProcessInfo> Scan()
     {
-        var windowedPids = GetWindowedClaudePids();
-        if (windowedPids.Count == 0) return Array.Empty<ClaudeProcessInfo>();
-
         var all = QueryAllClaudeProcesses();
+        if (all.Count == 0) return Array.Empty<ClaudeProcessInfo>();
+
+        var mainPids = ClaudeProcessMainIdentifier.IdentifyMainPids(
+            all.Select(p => (p.Pid, p.ParentPid)).ToList());
+        if (mainPids.Count == 0) return Array.Empty<ClaudeProcessInfo>();
+
+        var windowedPids = GetWindowedClaudePids();
+
         var childrenByParent = all
             .GroupBy(p => p.ParentPid)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<ProcessRecord>)g.ToList());
 
         var results = new List<ClaudeProcessInfo>();
-        foreach (var pid in windowedPids)
+        foreach (var pid in mainPids)
         {
             var self = all.FirstOrDefault(p => p.Pid == pid);
             if (self is null) continue; // raced with process exit
 
             var effectiveCmdline = EnrichWithUserDataDir(self, childrenByParent);
-            results.Add(new ClaudeProcessInfo(pid, effectiveCmdline, TryGetStartTime(pid)));
+            var isWindowed = windowedPids.Contains(pid);
+            results.Add(new ClaudeProcessInfo(
+                pid, effectiveCmdline, TryGetStartTime(pid), isWindowed));
         }
 
         return results;
@@ -105,32 +113,32 @@ public class WmiClaudeProcessScanner : IClaudeProcessScanner
     }
 
     /// <summary>
-    /// Returns <paramref name="windowed"/>.CommandLine if it already carries
+    /// Returns <paramref name="main"/>.CommandLine if it already carries
     /// a <c>--user-data-dir</c> flag; otherwise synthesises a minimal
     /// cmdline by appending the flag extracted from one of the main's
     /// direct children. If no child carries the flag either, the original
-    /// cmdline is returned unchanged (classification will simply treat the
-    /// process as external).
+    /// cmdline is returned unchanged (classification will simply treat
+    /// the process as external).
     /// </summary>
     private static string EnrichWithUserDataDir(
-        ProcessRecord windowed,
+        ProcessRecord main,
         IReadOnlyDictionary<int, IReadOnlyList<ProcessRecord>> childrenByParent)
     {
-        if (windowed.CommandLine.Contains(UserDataDirFlag, StringComparison.OrdinalIgnoreCase))
-            return windowed.CommandLine;
+        if (main.CommandLine.Contains(UserDataDirFlag, StringComparison.OrdinalIgnoreCase))
+            return main.CommandLine;
 
-        if (!childrenByParent.TryGetValue(windowed.Pid, out var children))
-            return windowed.CommandLine;
+        if (!childrenByParent.TryGetValue(main.Pid, out var children))
+            return main.CommandLine;
 
         foreach (var child in children)
         {
             var value = ExtractFlagValue(child.CommandLine, UserDataDirFlag);
             if (value is null) continue;
-            var own = windowed.CommandLine.TrimEnd();
+            var own = main.CommandLine.TrimEnd();
             return $"{own} {UserDataDirFlag}{value}";
         }
 
-        return windowed.CommandLine;
+        return main.CommandLine;
     }
 
     /// <summary>

@@ -26,7 +26,7 @@ public class RegexClaudeProcessClassifier : IClaudeProcessClassifier
         if (!match.Success) return null;
         if (!int.TryParse(match.Groups[1].Value, out var slotNumber)) return null;
 
-        return new SlotProcessInfo(process.ProcessId, slotNumber);
+        return new SlotProcessInfo(process.ProcessId, slotNumber, IsTrayResident: !process.IsWindowed);
     }
 
     public ExternalProcessInfo? TryClassifyAsExternal(ClaudeProcessInfo process)
