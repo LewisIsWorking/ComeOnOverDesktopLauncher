@@ -32,6 +32,7 @@ public class MainWindowViewModelTestFixture
     public IUpdateNotifier UpdateNotifier { get; } = Substitute.For<IUpdateNotifier>();
     public IClaudeVersionResolver ClaudeVersionResolver { get; } = Substitute.For<IClaudeVersionResolver>();
     public IProcessService ProcessService { get; } = Substitute.For<IProcessService>();
+    public IWindowThumbnailService ThumbnailService { get; } = Substitute.For<IWindowThumbnailService>();
     public ILoggingService Logger { get; } = Substitute.For<ILoggingService>();
     public IClaudeProcessScanner Scanner { get; } = Substitute.For<IClaudeProcessScanner>();
     public IClaudeProcessClassifier Classifier { get; } = Substitute.For<IClaudeProcessClassifier>();
@@ -58,7 +59,7 @@ public class MainWindowViewModelTestFixture
             Launcher, CooService,
             SettingsService, PathResolver, ResourceMonitor,
             StartupService, UpdateNotifier, VersionProvider,
-            ClaudeVersionResolver, ProcessService,
+            ClaudeVersionResolver, ProcessService, ThumbnailService,
             slotInstances, externalInstances, Logger);
     }
 }

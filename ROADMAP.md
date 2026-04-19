@@ -106,6 +106,54 @@
 - [x] **`Copy window screenshot to clipboard` button** - shipped in v1.7.3 using Avalonia 12's `RenderTargetBitmap.Render(visual)` + `ClipboardExtensions.SetBitmapAsync` (not GDI) - rendering the visual tree directly gives reliable results regardless of window state (maximised, partially covered, off-screen) that the original GDI `CopyFromScreen` approach would have struggled with. Image lands on the clipboard in every relevant Windows format simultaneously (`image/png`, `PNG`, `DeviceIndependentBitmap`, `Format17`, `Bitmap`) so it pastes into Slack/Discord/Word/Paint without fuss.
 - [x] 229 tests passing (up from 162 in v1.7.1), zero warnings, zero errors
 
+## v1.9.0 - Released
+
+![v1.9.0 UI](docs/screenshots/photo_2026-04-19_v1.9.0.png)
+
+First of three incremental releases delivering the card/thumbnail feature. v1.9.0 ships the capture infrastructure + a small thumbnail preview next to each slot row. v1.9.1 will migrate to a full grid card layout with large thumbnails. v1.9.2 adds click-to-enlarge.
+
+### Thumbnail capture infrastructure
+
+- [x] **New `IWindowThumbnailService.CapturePngBytes(pid, width, height) -> byte[]?`** in Core. Returns PNG bytes rather than an Avalonia `Bitmap` so Core stays Avalonia-free - the UI layer is responsible for decoding bytes into an `IImage` when rendering.
+- [x] **`PrintWindowThumbnailService`** - Win32 implementation using `PrintWindow` with `PW_RENDERFULLCONTENT=2`. The flag captures the window's full device context including Chromium-rendered content. Letterboxed scale-to-fit preserves aspect ratio. `CopyFromScreen` would fail when another window overlaps; `PrintWindow` works regardless.
+- [x] **Returns null (never throws) on recoverable failures** - process gone, no main window handle (tray-resident), GDI pressure. Null is a signal to preserve the existing thumbnail, not clear it - this is how tray-resident slots keep their last captured frame.
+- [x] **`System.Drawing.Common` 9.0.0** added to Core csproj for GDI bitmap operations. Deprecated cross-platform but supported on Windows-only builds like CoODL.
+- [x] **DI registered** in `App.axaml.cs` alongside the existing service registrations.
+
+### View model wiring
+
+- [x] **`ClaudeInstanceViewModel.Thumbnail`** - new `Avalonia.Media.Imaging.Bitmap?` observable property.
+- [x] **`UpdateThumbnailFromBytes(byte[]?)`** - null or empty bytes are a **no-op**, not a clear. This is the "frozen thumbnail" promise: when a slot close-to-trays, the capture service returns null and we deliberately leave the previous thumbnail in place so users can still recognise the slot visually. The previous bitmap is disposed when a new one replaces it so we don't leak GDI handles.
+- [x] **`ClearThumbnail()`** - explicit blank path, used only when the user toggles the feature off.
+- [x] **`MainWindowViewModel.ThumbnailsEnabled`** - new observable bool, initialised from `AppSettings.ThumbnailsEnabled` (default true). Toggling it persists to settings and, on disable, clears all existing thumbnails so the UI blanks immediately rather than showing stale captures.
+- [x] **Capture runs inside `RefreshResources`** - the existing poll tick. No separate cadence, no extra state to manage. Only visible slot rows (`SlotInstances.Items`) are captured; tray items (`SlotInstances.TrayItems`) retain their last-known frame.
+
+### Structural cleanup to fit under the 200-line limit
+
+- [x] **`ThumbnailRefresher`** - new static helper with three methods: `RefreshVisibleThumbnails`, `ClearAllThumbnails`, `HandleToggleChange`. Concentrates the thumbnail-lifecycle logic in one testable place.
+- [x] **`SlotCallbackBinder`** - extracted from MainWindowViewModel, wires per-row callbacks (nickname edit, kill) to launcher/settings. Small file, one job. Extraction was forced by the FileSizeLimitTests CI guard shipped in v1.8.2 catching MainWindowViewModel going over 200 lines - the guard is working exactly as designed.
+
+### UI changes
+
+- [x] **"Show thumbnails" checkbox** added to `LaunchControlsPanel.axaml` next to "Launch on startup". ToolTip explains the in-memory-only privacy story for users who want to know what's being captured.
+- [x] **80x50 thumbnail preview** added to the slot row template in `SlotInstanceList.axaml`, left of the slot pill. Placeholder when no thumbnail yet captured; populated after the first refresh tick. Tooltip points at the toggle for users who want to disable.
+
+### Scope note - externals deferred to v1.9.1
+
+External Claude instances (default-profile Claude started outside the launcher) don't get thumbnails in v1.9.0. They will gain thumbnail support in v1.9.1 alongside the grid card migration. Keeping externals out of v1.9.0 avoided a cascade of test-fixture updates for `ExternalInstanceListViewModel` and let this release ship tight and focused.
+
+### Privacy model
+
+- [x] **In-memory only** - thumbnails live as `Bitmap` objects on each `ClaudeInstanceViewModel`, lost on launcher restart. Nothing is written to disk.
+- [x] **Opt-out on by default** - the feature is discoverable (visible checkbox, visible thumbnails) but the user can flip it off without hunting.
+- [x] **Toggle off = immediate clear** - disabling the feature doesn't just stop future captures, it drops all existing thumbnails so nothing lingers in memory after the toggle.
+
+### Numbers
+
+- 247 tests passing (up from 243 - +4 new tests covering the `ClaudeInstanceViewModel` thumbnail lifecycle: null bytes = no-op, empty bytes = no-op, explicit clear, null-idempotency).
+- 0 warnings, 0 errors.
+- All files still ≤ 200 lines (verified by `FileSizeLimitTests`; caught one violation during development which forced a clean extraction rather than a trim).
+
 ## v1.8.3 - Released
 
 Behaviour-only release - no UI change, so the v1.8.2 screenshot still represents the UI accurately.

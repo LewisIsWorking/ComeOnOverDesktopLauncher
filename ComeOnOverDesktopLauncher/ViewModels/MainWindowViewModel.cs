@@ -33,6 +33,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IStartupService _startupService;
     private readonly IUpdateNotifier _updateNotifier;
     private readonly IProcessService _processService;
+    private readonly IWindowThumbnailService _thumbnailService;
     private readonly ILoggingService _logger;
     private readonly DispatcherTimer _refreshTimer;
     private AppSettings _settings;
@@ -49,6 +50,7 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _launchOnStartup;
     [ObservableProperty] private int _refreshIntervalSeconds;
     [ObservableProperty] private string? _updateAvailableMessage;
+    [ObservableProperty] private bool _thumbnailsEnabled;
 
     public string AppVersion { get; }
     public string? ClaudeVersion { get; }
@@ -69,6 +71,7 @@ public partial class MainWindowViewModel : ObservableObject
         IVersionProvider versionProvider,
         IClaudeVersionResolver claudeVersionResolver,
         IProcessService processService,
+        IWindowThumbnailService thumbnailService,
         SlotInstanceListViewModel slotInstances,
         ExternalInstanceListViewModel externalInstances,
         ILoggingService logger)
@@ -80,6 +83,7 @@ public partial class MainWindowViewModel : ObservableObject
         _startupService = startupService;
         _updateNotifier = updateNotifier;
         _processService = processService;
+        _thumbnailService = thumbnailService;
         SlotInstances = slotInstances;
         ExternalInstances = externalInstances;
         _logger = logger;
@@ -89,11 +93,12 @@ public partial class MainWindowViewModel : ObservableObject
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
         _refreshIntervalSeconds = _settings.ResourceRefreshIntervalSeconds;
+        _thumbnailsEnabled = _settings.ThumbnailsEnabled;
         _launchOnStartup = _startupService.IsStartupEnabled();
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
-        WireSlotCallbacks();
+        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, SaveSettings, RefreshResources);
 
         _refreshTimer = new DispatcherTimer
             { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };
@@ -101,28 +106,6 @@ public partial class MainWindowViewModel : ObservableObject
         _refreshTimer.Start();
         _logger.LogInfo($"MainWindowViewModel ready. ClaudeInstalled={_isClaudeInstalled}, SlotCount={_slotCount}");
         _ = CheckForUpdates();
-    }
-
-    /// <summary>
-    /// Hands per-row slot callbacks to <see cref="SlotInstances"/>. The
-    /// slot VM doesn't own <c>AppSettings</c> or the launcher, so it
-    /// can't do these itself - it just forwards from the row controls.
-    /// Kept as lambdas so each callback sits next to the state it
-    /// mutates, and so the adapter layer is one method rather than four.
-    /// </summary>
-    private void WireSlotCallbacks()
-    {
-        SlotInstances.GetSlotName = num => _settings.GetSlotName(num);
-        SlotInstances.OnSlotNameChanged = (slotNumber, name) =>
-        {
-            _settings.SlotNames[slotNumber] = name;
-            SaveSettings();
-        };
-        SlotInstances.OnKillInstance = processId =>
-        {
-            _launcher.KillInstance(processId);
-            RefreshResources();
-        };
     }
 
     partial void OnLaunchOnStartupChanged(bool value)
@@ -140,6 +123,16 @@ public partial class MainWindowViewModel : ObservableObject
         _settings.ResourceRefreshIntervalSeconds = value;
         SaveSettings();
     }
+
+    // When the user toggles the "Show thumbnails" checkbox the
+    // ThumbnailRefresher handles settings persistence + clearing stale
+    // captures if the toggle went off. See ThumbnailRefresher.HandleToggleChange
+    // for the full rationale (including why v1.9.0 only covers slot
+    // collections and externals join in v1.9.1).
+    partial void OnThumbnailsEnabledChanged(bool value) =>
+        ThumbnailRefresher.HandleToggleChange(
+            value, _settings, SaveSettings,
+            SlotInstances.Items, SlotInstances.TrayItems);
 
     [RelayCommand]
     private void LaunchInstances()
@@ -182,6 +175,14 @@ public partial class MainWindowViewModel : ObservableObject
         TotalCpuPercent = _resourceMonitor.TotalCpuPercent;
         SlotInstances.Refresh(snapshots);
         ExternalInstances.Refresh(snapshots);
+
+        if (ThumbnailsEnabled)
+        {
+            // v1.9.0 covers slot thumbnails only. External instances
+            // will join in v1.9.1 alongside the grid card migration.
+            ThumbnailRefresher.RefreshVisibleThumbnails(
+                _thumbnailService, SlotInstances.Items, 240, 150);
+        }
     }
 
     [RelayCommand]

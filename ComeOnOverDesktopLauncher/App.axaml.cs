@@ -93,6 +93,7 @@ public partial class App : Application
         services.AddSingleton<IProcessService, SystemProcessService>();
         services.AddSingleton<IClaudeProcessScanner, WmiClaudeProcessScanner>();
         services.AddSingleton<IClaudeProcessClassifier, RegexClaudeProcessClassifier>();
+        services.AddSingleton<IWindowThumbnailService, PrintWindowThumbnailService>();
         services.AddSingleton<IRegistryService, WindowsRegistryService>();
         services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
