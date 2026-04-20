@@ -131,6 +131,22 @@ $s.Save()
 
 **Upstream reporting**: worth filing a Velopack issue citing the log sequence. Until fixed, consider either (a) documenting the workaround in `docs/MIGRATION.md` for any user who hits it, or (b) having the launcher itself self-heal on startup - check for the shortcut, recreate if missing. Option (b) is more ambitious but would cover all users transparently.
 
+**v1.10.2 update: option (b) shipped.** `IShortcutHealer` runs on every startup; if the Velopack install's Start Menu .lnk is missing it is recreated via the same `WScript.Shell` COM API Velopack itself uses. Dev-build guard skips the heal on `dotnet run`. Six unit tests cover every branch. Upstream issue still worth filing but users no longer hit the bug regardless of Velopack fix timeline.
+
+### Watch out: MSIX-sandboxed PowerShell resolves `$env:LOCALAPPDATA` to a virtualized path
+
+Learned while investigating the Start Menu shortcut bug above. When running PowerShell from inside an MSIX-sandboxed process (e.g. Claude Desktop's terminal), `$env:LOCALAPPDATA` resolves to the sandbox's redirected path:
+
+```
+$env:LOCALAPPDATA = C:\Users\Lewis\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local
+```
+
+not the real `C:\Users\Lewis\AppData\Local`. If you construct paths from `$env:LOCALAPPDATA` (e.g. when manually rebuilding a shortcut), the resulting paths will be **virtualized paths that don't exist outside the sandbox**. Windows Shell won't be able to resolve them, the target won't be found, icons won't load.
+
+Fix: construct paths from `$env:USERPROFILE` instead (`$env:USERPROFILE\AppData\Local\...`). `USERPROFILE` is not virtualized by the MSIX sandbox.
+
+This doesn't affect the C# app at runtime - `Environment.GetFolderPath(SpecialFolder.LocalApplicationData)` resolves correctly in the installed launcher because the installed launcher itself isn't MSIX-sandboxed. Only matters when you're running *manual* PowerShell commands from a sandboxed shell to diagnose or fix launcher state.
+
 ### Startup update-check is noisy about old non-Velopack releases
 
 Same v1.10.0 → v1.10.1 session surfaced: on startup the update check walks backwards through every v1.x GitHub release looking for `releases.win.json`, generating a trace exception for every release older than v1.10.0:

@@ -32,6 +32,13 @@ public partial class App : Application
         _serviceProvider = ConfigureServices().BuildServiceProvider();
         _serviceProvider.GetRequiredService<IClaudePathCache>().Refresh();
 
+        // Self-heal any Start Menu shortcut the Velopack updater may
+        // have left empty during a previous update apply. See
+        // docs/dev/VELOPACK.md for the upstream bug this works around.
+        // Runs early but after DI so logging is wired up; runs before
+        // MainWindow is shown so it doesn't race with user activity.
+        _serviceProvider.GetRequiredService<IShortcutHealer>().HealIfMissing();
+
         _slotProcessMonitor = _serviceProvider.GetRequiredService<ISlotProcessMonitor>();
         _slotProcessMonitor.Start(TimeSpan.FromSeconds(2));
         _seedCacheUpdater = _serviceProvider.GetRequiredService<SlotSeedCacheUpdater>();
@@ -111,6 +118,8 @@ public partial class App : Application
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IVersionProvider, VersionProvider>();
         services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();
+        services.AddSingleton<IShellLinkWriter, WScriptShellLinkWriter>();
+        services.AddSingleton<IShortcutHealer, WindowsShortcutHealer>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IWindowSnapshotService, WindowSnapshotService>();
         services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();

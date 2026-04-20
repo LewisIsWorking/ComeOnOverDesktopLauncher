@@ -2,6 +2,36 @@
 
 Current and upcoming work. Historical release notes for v1.0-v1.8.x live in [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md).
 
+## v1.10.2 - Released
+
+User-visible fix for the Start Menu shortcut regression observed during the first real-world v1.10.0 → v1.10.1 auto-update. Velopack 0.0.1298's update apply logged success for the Start Menu `.lnk` but left the Programs folder empty; Windows Search could not find the app. v1.10.2 self-heals on startup.
+
+### New `IShortcutHealer` service
+
+- [x] **`IShortcutHealer.HealIfMissing()`** runs once at app startup after DI is built, before `MainWindow.Show()`. Branches four ways:
+  - **`SkippedDevBuild`** — running exe lives outside `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\current\`; nothing to heal. No disk touch.
+  - **`AlreadyPresent`** — expected shortcut exists; no-op.
+  - **`HealedMissing`** — shortcut was missing, recreated successfully via WScript.Shell COM.
+  - **`Failed`** — shortcut was missing and recreation failed; logged, launcher starts normally anyway (non-blocking).
+- [x] **`IShellLinkWriter`** abstraction over the COM API means the healer is unit-testable without real COM. `WScriptShellLinkWriter` is the production implementation; tests substitute an `NSubstitute` mock.
+- [x] **Testable branching** via two injected delegates: `Func<string> getRunningExePath` and `Func<string, bool> fileExists`. Unit tests drive every result path deterministically.
+- [x] **6 new tests** in `WindowsShortcutHealerTests`: dev-build skip, shortcut-present no-op, shortcut-missing-heals, shortcut-missing-writer-fails, case-insensitive path comparison (Velopack records case-preserving, Windows FS is case-insensitive), probe exception collapses to Failed (never throws out of `HealIfMissing`).
+
+### Why self-heal and not wait for upstream
+
+Velopack 0.0.1298 is the bug's source but a Velopack fix (a) may take weeks, (b) would only reach users on the _next_ update after the fix shipped upstream. The self-heal runs locally on every CoODL launch, so even users currently running a broken v1.10.1 install will see their shortcut restored on next launch after upgrading to v1.10.2. Also defensive against any future recurrence and against users who delete the shortcut themselves — noted tradeoff but low-cost to restore.
+
+### CA1416 test fix
+
+- [x] Annotated `WindowsShortcutHealerTests` with `[SupportedOSPlatform("windows")]`. Per the never-suppress rule, fixing the CA1416 warnings at the root rather than with `NoWarn` - the test class genuinely _is_ Windows-only.
+
+### Numbers
+
+- 253 tests passing (247 + 6 new). 0 warnings, 0 errors.
+- 5 files added (`IShortcutHealer`, `IShellLinkWriter`, `WScriptShellLinkWriter`, `WindowsShortcutHealer`, `WindowsShortcutHealerTests`). 1 file modified (`App.axaml.cs`: DI + startup call).
+- All files ≤200 lines.
+- Local `vpk pack` unchanged (no CI changes, no new Velopack behaviour).
+
 ## v1.10.1 - Released
 
 Validation hotfix for the v1.10.0 Velopack migration. Ships a one-line log-message enrichment purely so the auto-update pipeline can be exercised end-to-end: v1.10.0 users should receive this release automatically on their next poll tick (up to 6 hours) or next launcher restart.
