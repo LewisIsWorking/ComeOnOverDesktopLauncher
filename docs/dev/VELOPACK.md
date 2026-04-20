@@ -104,3 +104,41 @@ Fix: add a `vpk download github` step BEFORE `vpk pack`:
 The `continue-on-error: true` is required because the v1.10.0 release was the first Velopack release and had no predecessor - without that flag, a first release would fail at the download step.
 
 Auto-update still works without deltas; clients just download the full `.nupkg` (~49 MB) each time instead of a small diff. Disk/bandwidth efficiency loss, not a functional bug. Delta generation should kick in from whichever release first lands with the `vpk download github` step active.
+
+### Upstream bug: Start Menu shortcut may vanish during update apply
+
+Observed on 2026-04-20 during v1.10.0 → v1.10.1 auto-update on the first real-world install. Velopack's install step correctly created the Start Menu `.lnk`. During the update apply step, Velopack's log said:
+
+```
+[INFO] Will update all current shortcuts: [..., (START_MENU, ...\ComeOnOver Desktop Launcher.lnk)]
+[INFO] Updating existing shortcut '...\Start Menu\...\ComeOnOver Desktop Launcher.lnk' (START_MENU)
+[INFO] Package applied successfully.
+```
+
+But after apply, the `.lnk` was gone. The parent folder (`...\Start Menu\Programs\ComeOnOverDesktopLauncher\`) remained, just empty. Desktop shortcut survived fine. This means: Windows Search cannot find the app, the user cannot launch via Start Menu.
+
+**User-facing workaround** (one-liner, no admin needed):
+
+```powershell
+$exe = "$env:LOCALAPPDATA\ComeOnOverDesktopLauncher\current\ComeOnOverDesktopLauncher.exe"
+$lnk = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\ComeOnOverDesktopLauncher\ComeOnOver Desktop Launcher.lnk"
+$sh = New-Object -ComObject WScript.Shell
+$s = $sh.CreateShortcut($lnk)
+$s.TargetPath = $exe
+$s.WorkingDirectory = Split-Path $exe
+$s.Save()
+```
+
+**Upstream reporting**: worth filing a Velopack issue citing the log sequence. Until fixed, consider either (a) documenting the workaround in `docs/MIGRATION.md` for any user who hits it, or (b) having the launcher itself self-heal on startup - check for the shortcut, recreate if missing. Option (b) is more ambitious but would cover all users transparently.
+
+### Startup update-check is noisy about old non-Velopack releases
+
+Same v1.10.0 → v1.10.1 session surfaced: on startup the update check walks backwards through every v1.x GitHub release looking for `releases.win.json`, generating a trace exception for every release older than v1.10.0:
+
+```
+[Trace] System.ArgumentException: Could not find asset called 'releases.win.json' in GitHub Release 'v1.9.2'.
+[Trace] System.ArgumentException: Could not find asset called 'releases.win.json' in GitHub Release 'v1.9.1'.
+...
+```
+
+These are all pre-Velopack releases so the absence is correct. Velopack retries on each one until it hits a release that does have the manifest. Performance impact: ~1 second of extra startup time per launch and a lot of Trace-level noise in the Velopack log. Functional impact: none. Upstream should consider short-circuiting after the first missing-manifest result, or at minimum downgrading these to `Debug` level.
