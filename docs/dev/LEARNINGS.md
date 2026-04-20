@@ -6,8 +6,9 @@ Read this FIRST at the start of any CoODL session. Add to it whenever a lesson i
 
 ## Companion docs
 
-- **`docs/dev/BUILD-AND-TOOLING.md`** — line-count audit, PowerShell / heredoc quirks, commit-message workflow, CI runner gotchas, screenshot workflow, UI-Automation snippets, the release checklist.
+- **`docs/dev/BUILD-AND-TOOLING.md`** — line-count audit, PowerShell / heredoc quirks, commit-message workflow, CI runner gotchas, screenshot workflow, UI-Automation snippets, the release checklist, Velopack packaging, code-signing future plans.
 - **`docs/dev/REFACTOR-AND-XAML.md`** — NSubstitute / fixture gotchas, Avalonia compiled-binding pitfalls (`string` -> `Color`, `Tapped` vs `PointerPressed`, `IsHitTestVisible` on child images/overlays), WMI scanner Electron quirk, close-to-tray process state, clipboard bitmap capture.
+- **`docs/MIGRATION.md`** — user-facing v1.9.x -> v1.10.0 migration guide (portable .exe -> Setup.exe + auto-update).
 
 ## Hard rules (repeated here for emphasis)
 
@@ -33,6 +34,7 @@ These come from the project owner and are non-negotiable:
 - Scanner→Classifier→ViewModel pipeline. Scanner returns raw `ClaudeProcessInfo`. Classifier returns typed `SlotProcessInfo` / `ExternalProcessInfo` / null. VMs filter + reconcile.
 - `IThumbnailableViewModel` is the shared surface across both `ClaudeInstanceViewModel` and `ExternalInstanceViewModel`, letting `ThumbnailRefresher` treat both uniformly without a common base class (v1.9.1+).
 - Per-row callbacks live as `Action<T>? OnSomething` properties on the list VM, wired via `SlotCallbackBinder.Bind` (slots) + `SlotCallbackBinder.BindExternal` (externals). Keeps row VMs free of service dependencies.
+- **Velopack auto-update** (v1.10.0+): `VelopackApp.Build().Run()` MUST run as the first line of `Program.Main`, before Avalonia boots. Velopack's `UpdateManager` is a concrete type wrapped by our `IAutoUpdateService` adapter for testability. Update orchestration lives in `MainWindowUpdateViewModel` (sub-VM pattern) + `UpdateOrchestrator` (state machine) so `MainWindowViewModel` stays under the 200-line cap. Full design rationale in `docs/dev/BUILD-AND-TOOLING.md`.
 
 ## Memory / mental model
 

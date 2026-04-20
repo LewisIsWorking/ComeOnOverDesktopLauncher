@@ -2,126 +2,67 @@
 
 Current and upcoming work. Historical release notes for v1.0-v1.8.x live in [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md).
 
-## v1.9.0 - Released
+## v1.10.0 - Released
 
-![v1.9.0 UI](docs/screenshots/photo_2026-04-19_v1.9.0.png)
+> ⚠️ **Migration notice.** v1.10.0 switches CoODL from a portable single-exe distribution to a Velopack-based installer with background auto-update. Existing users must download `ComeOnOverDesktopLauncher-win-Setup.exe` once from the [v1.10.0 release page](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/releases/tag/v1.10.0); from v1.10.1 onwards updates apply automatically. See [`docs/MIGRATION.md`](docs/MIGRATION.md) for step-by-step migration notes. Settings, slot nicknames, login sessions and Claude slot data all persist unchanged.
 
-First of three incremental releases delivering the card/thumbnail feature. v1.9.0 ships the capture infrastructure + a small thumbnail preview next to each slot row. v1.9.1 will migrate to a full grid card layout with large thumbnails. v1.9.2 adds click-to-enlarge.
+The plumbing release. No new end-user features; instead, the entire distribution and update story gets rebuilt on top of [Velopack](https://velopack.io) so future releases can reach users without a manual download every time.
 
-### Thumbnail capture infrastructure
+### Velopack integration
 
-- [x] **New `IWindowThumbnailService.CapturePngBytes(pid, width, height) -> byte[]?`** in Core. Returns PNG bytes rather than an Avalonia `Bitmap` so Core stays Avalonia-free - the UI layer is responsible for decoding bytes into an `IImage` when rendering.
-- [x] **`PrintWindowThumbnailService`** - Win32 implementation using `PrintWindow` with `PW_RENDERFULLCONTENT=2`. The flag captures the window's full device context including Chromium-rendered content. Letterboxed scale-to-fit preserves aspect ratio. `CopyFromScreen` would fail when another window overlaps; `PrintWindow` works regardless.
-- [x] **Returns null (never throws) on recoverable failures** - process gone, no main window handle (tray-resident), GDI pressure. Null is a signal to preserve the existing thumbnail, not clear it - this is how tray-resident slots keep their last captured frame.
-- [x] **`System.Drawing.Common` 9.0.0** added to Core csproj for GDI bitmap operations. Deprecated cross-platform but supported on Windows-only builds like CoODL.
-- [x] **DI registered** in `App.axaml.cs` alongside the existing service registrations.
+- [x] **`Velopack` 0.0.1298 package reference** added. Velopack is .NET-native, actively maintained (latest SDK Feb 2026), and the modern successor to Squirrel.Windows. Runs in Rust for native-fast pack/update performance.
+- [x] **`VelopackApp.Build().OnFirstRun(...).Run()` as the first line of `Program.Main`** — before Avalonia boots. Velopack's install/update/uninstall hooks launch our exe with special CLI arguments; the `Run()` call intercepts them and short-circuits before any Avalonia window would appear. Placing this call anywhere later triggers a loud warning from `vpk pack` and causes hook UX to stutter.
+- [x] **New `IAutoUpdateService` interface** + `VelopackAutoUpdateService` implementation. Wraps Velopack's concrete `UpdateManager` behind our standard `I<Service>` abstraction so VMs depend on an interface and tests can substitute. `GithubSource` wired to the CoODL releases repo. Dev-build guard returns `NoUpdateAvailable` when `!IsInstalled` so `dotnet run` never hits the network.
+- [x] **Logging on every service call** — `CheckForUpdatesAsync`, `DownloadUpdatesAsync`, and `ApplyUpdatesAndRestart` each emit info-level log lines with the relevant state. Per the permanent-logging hard rule.
 
-### View model wiring
+### Install + update UX (the 6 locked design decisions)
 
-- [x] **`ClaudeInstanceViewModel.Thumbnail`** - new `Avalonia.Media.Imaging.Bitmap?` observable property.
-- [x] **`UpdateThumbnailFromBytes(byte[]?)`** - null or empty bytes are a **no-op**, not a clear. This is the "frozen thumbnail" promise: when a slot close-to-trays, the capture service returns null and we deliberately leave the previous thumbnail in place so users can still recognise the slot visually. The previous bitmap is disposed when a new one replaces it so we don't leak GDI handles.
-- [x] **`ClearThumbnail()`** - explicit blank path, used only when the user toggles the feature off.
-- [x] **`MainWindowViewModel.ThumbnailsEnabled`** - new observable bool, initialised from `AppSettings.ThumbnailsEnabled` (default true). Toggling it persists to settings and, on disable, clears all existing thumbnails so the UI blanks immediately rather than showing stale captures.
-- [x] **Capture runs inside `RefreshResources`** - the existing poll tick. No separate cadence, no extra state to manage. Only visible slot rows (`SlotInstances.Items`) are captured; tray items (`SlotInstances.TrayItems`) retain their last-known frame.
+- [x] **v1.10.0 is the cutover** (decision 1-A). Not a parallel portable-plus-installer transitional release — single clean switch. Release notes explain the one-time migration.
+- [x] **Installs to `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\current\`** (decision 2-a). Velopack default. No UAC prompt on install or updates; per-user install matches modern launcher-style app convention (Discord, Slack, VS Code, Claude Desktop itself).
+- [x] **Desktop + Start Menu shortcuts** created at install time (decision 3-c, `--shortcuts "Desktop,StartMenu"`). Users get one-click access from both common surfaces. The "Launch on startup" checkbox in the launcher still owns the startup-folder entry, so there's no collision with Velopack's `Startup` shortcut.
+- [x] **Silent download, prompt to restart** (decision 4-b). Background check every 6 hours; when an update is found, silent download with progress shown in a blue banner; when ready, green "Restart to install vX.Y.Z" banner appears. User clicks when convenient. Restart timing matters more than update timing for people mid-Claude-conversation.
+- [x] **"Auto-update" checkbox, default ON** (decision 5-a). Persisted in `AppSettings.AutoCheckForUpdates`. Users who prefer manual control can toggle it off; subsequent check ticks are skipped. Same ethos as the existing "Show thumbnails" and "Launch on startup" toggles.
+- [x] **No code signing for v1.10.0** (decision 6-a). Users see Windows SmartScreen's "More info" dialog on first install; subsequent auto-updates inherit trust from the already-installed binary and don't re-trigger it. Azure Trusted Signing documented as the future cost-effective signing option in `docs/dev/BUILD-AND-TOOLING.md`.
 
-### Structural cleanup to fit under the 200-line limit
+### State-aware update banner
 
-- [x] **`ThumbnailRefresher`** - new static helper with three methods: `RefreshVisibleThumbnails`, `ClearAllThumbnails`, `HandleToggleChange`. Concentrates the thumbnail-lifecycle logic in one testable place.
-- [x] **`SlotCallbackBinder`** - extracted from MainWindowViewModel, wires per-row callbacks (nickname edit, kill) to launcher/settings. Small file, one job. Extraction was forced by the FileSizeLimitTests CI guard shipped in v1.8.2 catching MainWindowViewModel going over 200 lines - the guard is working exactly as designed.
+- [x] **Three mutually-exclusive sub-banners** in `LaunchControlsPanel`:
+  - **Blue (Downloading)**: live progress bar + "Downloading v1.10.1... 42%" text. Shows that background work is happening without forcing user attention.
+  - **Green (ReadyToInstall)**: "v1.10.1 ready - restart to install" + "What's new" button (opens GitHub release notes) + "Restart to install" button.
+  - **Amber (Failed)**: "Update check failed. Will retry automatically later." + "Retry now" button for user-triggered retry.
+- [x] **`Update` sub-VM** (`MainWindowUpdateViewModel`) exposes all four states and the three commands. Same pattern as `SlotInstances` and `ExternalInstances` sub-VMs; XAML binds through `Update.IsDownloading`, `Update.RestartCommand` etc.
+- [x] **`UpdateOrchestrator` state machine** (`Idle -> Checking -> Downloading -> ReadyToInstall | Failed`) lives as a pure non-UI helper so state transitions are 100% testable without Avalonia. 10 state-machine tests cover every transition and guard.
 
-### UI changes
+### Retired
 
-- [x] **"Show thumbnails" checkbox** added to `LaunchControlsPanel.axaml` next to "Launch on startup". ToolTip explains the in-memory-only privacy story for users who want to know what's being captured.
-- [x] **80x50 thumbnail preview** added to the slot row template in `SlotInstanceList.axaml`, left of the slot pill. Placeholder when no thumbnail yet captured; populated after the first refresh tick. Tooltip points at the toggle for users who want to disable.
+- [x] **`IUpdateNotifier` + `UpdateNotifier`** (the old v1.5 GitHub-releases-polling banner code). Replaced by the Velopack pipeline above.
+- [x] **`IUpdateChecker` + `GitHubUpdateChecker`** (the old `HttpClient`-based version comparison).
+- [x] **`UpdateNotifierTests` + `GitHubUpdateCheckerTests`** deleted (10 tests total).
+- [x] **`HttpClient` DI registration** removed — nothing else in the app uses it.
+- Net test count: 237 (Phase 2) + 10 new orchestrator tests = 247. Same as v1.9.2.
 
-### Scope note - externals deferred to v1.9.1
+### Build pipeline rewrite
 
-External Claude instances (default-profile Claude started outside the launcher) don't get thumbnails in v1.9.0. They will gain thumbnail support in v1.9.1 alongside the grid card migration. Keeping externals out of v1.9.0 avoided a cascade of test-fixture updates for `ExternalInstanceListViewModel` and let this release ship tight and focused.
+- [x] **`.github/workflows/release.yml` rebuilt around `vpk pack` + `vpk upload github`**. Softprops action-gh-release dropped — Velopack creates the GitHub release itself. Key changes: `fetch-depth: 0` on checkout (delta generation needs git history); `PublishSingleFile=false` (Velopack needs multi-file output); version extraction step that strips the `v` prefix from the tag because Velopack rejects it.
+- [x] **.NET 10 end-to-end on CI**. The old `net10.0 -> net9.0` regex substitution hack is gone. `actions/setup-dotnet@v4` with `dotnet-version: '10.0.x'` installs the SDK directly — latest SDK 10.0.202 released 2026-04-14, GA support through Nov 2028.
+- [x] **Artifacts produced by each release**:
+  - `ComeOnOverDesktopLauncher-win-Setup.exe` — the installer end users download
+  - `ComeOnOverDesktopLauncher-{version}-full.nupkg` — full Velopack update package
+  - `ComeOnOverDesktopLauncher-{version}-delta.nupkg` — incremental diff from previous release (v1.10.1 onwards only)
+  - `ComeOnOverDesktopLauncher-win-Portable.zip` — bonus portable variant for users who prefer no installer
 
-### Privacy model
+### Doc additions
 
-- [x] **In-memory only** - thumbnails live as `Bitmap` objects on each `ClaudeInstanceViewModel`, lost on launcher restart. Nothing is written to disk.
-- [x] **Opt-out on by default** - the feature is discoverable (visible checkbox, visible thumbnails) but the user can flip it off without hunting.
-- [x] **Toggle off = immediate clear** - disabling the feature doesn't just stop future captures, it drops all existing thumbnails so nothing lingers in memory after the toggle.
-
-### Numbers
-
-- 247 tests passing (up from 243 - +4 new tests covering the `ClaudeInstanceViewModel` thumbnail lifecycle: null bytes = no-op, empty bytes = no-op, explicit clear, null-idempotency).
-- 0 warnings, 0 errors.
-- All files still ≤ 200 lines (verified by `FileSizeLimitTests`; caught one violation during development which forced a clean extraction rather than a trim).
-
-## v1.8.3 - Released
-
-Behaviour-only release - no UI change, so the v1.8.2 screenshot still represents the UI accurately.
-
-### Route Claude Desktop stderr into CoODL's diagnostic log
-
-- [x] **New `IProcessService.StartWithStderrPipe(fileName, arguments, onStderrLine)`** method. `SystemProcessService` redirects the child's stderr stream and pipes each line to the supplied callback via `BeginErrorReadLine`. The process handle is disposed on exit so we don't leak across many launches.
-- [x] **`ClaudeInstanceLauncher.LaunchSlot`** now calls `StartWithStderrPipe` with a callback that forwards each line through `ILoggingService.LogWarning` tagged `[claude slot N stderr]`. The callback captures `slot.SlotNumber` (always available at capture time), not `pid` - capturing `pid` would race the background reader thread that `BeginErrorReadLine` spawns, and the first stderr line could arrive before the assignment completed.
-- [x] **Only stderr is redirected, not stdout.** `.NET`'s paired `BeginOutputReadLine` + `BeginErrorReadLine` can deadlock in edge cases where one stream's reader blocks while the other fills its buffer. Claude rarely prints to stdout, and we only care about deprecation warnings + IPC errors, which all go to stderr. Single-stream capture is safer.
-
-### Upstream issue catalogue
-
-- [x] **New `docs/dev/UPSTREAM-CLAUDE-DESKTOP-BUGS.md`** documents four Claude-internal issues surfaced via `--trace-deprecation`, with call-site offsets and suggested upstream fixes:
-    - **DEP0040** - some dep in `index.pre.js` still calls `require('punycode')`; clock is ticking before Node removes the built-in.
-    - **DEP0169** - `Sle.request(...)` inside `index.pre.js` calls `url.parse()`; Node explicitly says no CVEs will be issued for `url.parse` security bugs.
-    - **BuddyBleTransport.reportState** - renderer emits an IPC message with no registered handler on the main process. BLE-buddy feature may be silently broken.
-    - **MaxListenersExceededWarning** on minified class `RAr` - possible listener leak.
-- [x] All four are Claude-internal - CoODL cannot patch them - but they're now preserved in our own log, tagged, and catalogued for when Anthropic asks "how did you hit that?".
-
-### Why route-to-log is not suppression
-
-Lewis set the rule explicitly: NEVER SUPPRESS. The four warnings above are real issues with real consequences (`punycode` removal will break Claude on future Node majors; `url.parse` is an ongoing security footgun; BuddyBle may indicate a broken feature; MaxListeners may indicate a leak). Hiding them would be dishonest.
-
-The v1.8.3 behaviour is not suppression - it is *routing*. Before v1.8.3: warnings were emitted to stderr, inherited into whatever parent process spawned CoODL (a terminal in dev, nothing in prod). They were ephemeral and only visible if you happened to be watching. After v1.8.3: warnings are captured into `launcher-YYYY-MM-DD.log` alongside every other diagnostic entry, tagged with the slot number that produced them, timestamped, and reviewable forever. Strictly more information, not less.
+- [x] **`docs/MIGRATION.md`** — step-by-step v1.9.x → v1.10.0 user guide covering Setup.exe download, SmartScreen dismissal, optional "Launch on startup" re-toggle (registry path change), where settings persist across the switch, uninstall procedure, and rollback.
+- [x] **`docs/dev/BUILD-AND-TOOLING.md`** gets a full Velopack section — local `vpk pack` commands, the `PublishSingleFile=false` invariant, the `fetch-depth: 0` invariant, the post-ship validation strategy (ship v1.10.1 trivial hotfix to prove auto-update works), code-signing future plans.
+- [x] **`docs/dev/LEARNINGS.md`** gets a new architecture invariant entry for Velopack + cross-references to the companion docs.
+- [x] **`README.md`** install section rewritten — points at `Setup.exe` rather than the portable .exe, mentions the SmartScreen warning, links to MIGRATION.md, preserves the portable-zip option for users who want it.
 
 ### Numbers
 
-- 243 tests passing (unchanged from v1.8.2; no new tests because `SystemProcessService` follows the existing pattern of being tested by proxy through the `IProcessService` mock).
-- 0 warnings, 0 errors.
-- All files still ≤ 200 lines (verified via `FileSizeLimitTests` CI guard).
-
-## v1.8.2 - Released
-
-![v1.8.2 UI](docs/screenshots/photo_2026-04-19_v1.8.2.png)
-
-This release is mostly invisible to end users - it's a structural cleanup release that eliminates technical debt and adds two new identity features. But the structural work unblocks faster feature delivery afterwards.
-
-### New features
-- [x] **"Slot N" identity pill** on every launcher-managed slot row. Previously the only identifier was the editable nickname (defaulting to "Instance N"), which conflated *identity* (which ClaudeSlotN data directory the instance uses) with *naming* (user-chosen label like "Work" or "Personal"). The pill now carries the identity explicitly and the nickname textbox becomes a proper free-text label. Slot number comes from the real `--user-data-dir=...\ClaudeSlotN` cmdline match so it's always accurate even when slots are opened out of order.
-- [x] **Tray-resident slot detection and surfacing.** Slots that have been close-to-tray'd (window hidden, process tree still alive, still counting toward Total RAM) now appear in a new "Hidden / tray" section below the visible slot list. Before v1.8.2 these vanished from the launcher entirely because the scanner's windowed-only filter (`MainWindowHandle != 0`) suppressed them, leaving the user to hunt for them in the system tray icon stack.
-    - New `ClaudeProcessInfo.IsWindowed` property on the core model.
-    - New `SlotProcessInfo.IsTrayResident` propagated from `!IsWindowed` at classification time.
-    - Scanner filter changed from "is windowed" to "is main process" (parent is not another claude.exe). This correctly includes tray-resident main processes while still excluding the ~10 Electron child processes per slot.
-    - `SlotInstanceListViewModel` split into `Items` (visible) + `TrayItems` (tray-resident) collections; reconciliation runs on both in parallel. Slots transition cleanly between collections when close-to-tray'd or restored.
-    - New `TrayInstanceList.axaml` UserControl renders the hidden section with read-only nickname (can't usefully edit the name of a slot you can't see) and a "Quit" button that force-kills the process tree (no confirm dialog - the slot has no visible window whose state could be lost).
-
-### Structural cleanup
-- [x] **Six files brought back under the 200-line limit.** The hard rule from the project's LEARNINGS.md is "≤200 lines per file, extract via OOP when a file grows past", but six files had drifted over during v1.7.x / v1.8.0 development and nobody (including Claude) noticed until an audit for this release.
-    - `MainWindow.axaml` (301 lines) → split into 5 UserControls: `LaunchControlsPanel`, `ResourceTotalsRow`, `SlotInstanceList`, `TrayInstanceList` (new), `ExternalInstanceList`. MainWindow is now a 55-line thin composition of these controls. The Copy Screenshot button moved from an inline `Click=` handler in MainWindow to a `RoutedEvent` exposed by `ResourceTotalsRow` - the UserControl can't capture the parent window itself, so it raises `CopyClicked` and MainWindow's code-behind handles it (where the window reference is available).
-    - `FileSlotSeedCache.cs` (219 lines) → validation helpers extracted into `SeedCacheValidators` (pure functions for SQLite-header check + Local State encrypted-key presence check). FSSC now at 188 lines and focused on IO orchestration.
-    - Four oversized test files split into fixture + scenario-focused classes: `MainWindowViewModelTests` (208 → 3 files), `SlotInstanceListViewModelTests` (222 → fixture + filter + lifecycle + tray), `ExternalInstanceListViewModelTests` (242 → fixture + refresh + close), `SlotInitialiserTests` (219 → fixture + source ordering + fallback).
-
-### CI guard against regression
-- [x] **New `FileSizeLimitTests.NoCodeFileExceedsTwoHundredLines`** test enumerates every `.cs` and `.axaml` file in the solution and fails `dotnet test` if any exceeds 200 lines. The GitHub Actions release workflow runs `dotnet test`, so any future PR that reintroduces an oversized file will fail CI before it can merge. Prevents the silent debt accumulation we just cleaned up.
-
-### Learnings followed from `docs/dev/LEARNINGS.md`
-The NSubstitute-import gotcha (every new test file needs `using NSubstitute;` explicitly), the Avalonia compiled-XAML UserControl split pattern (`x:DataType` on the UserControl + `x:Name` not `Name=` + RoutedEvent pattern for code-behind handlers), and the `start_process` working-directory drift were all documented in LEARNINGS before this release. Still hit them during the refactor anyway - the new session-start rule is to read LEARNINGS first, always.
-
-### Numbers
-- 243 tests passing (up from 229 - +14 new: 6 `ClaudeProcessMainIdentifier`, 7 slot tray behaviour, 1 CI guard).
-- 0 warnings, 0 errors.
-- Every `.cs` / `.axaml` file now ≤ 200 lines.
-
-## v1.8.1 - Released
-
-![v1.8.1 UI](docs/screenshots/photo_2026-04-18_v1.8.1.png)
-
-- [x] **Custom app icon** - three diagonally-cascaded amber windows on a dark rounded-square backdrop, matching the launcher's own title-bar accent (#FFC107 on #1E1E1E) so the icon reads as "this app" when it sits next to the launcher window on the taskbar. The stacked-window glyph literally depicts what the launcher does (opens multiple Claude instances) and the silhouette survives aggressive downscaling to 32px without losing meaning.
-    - **Source**: single authoritative `docs/design/appicon.svg` at 1024x1024. Opacity stack 0.35 / 0.62 / 1.0 gives depth without gradients (forbidden per the design rules and bad for small-size rendering anyway). Tiny title-bar dots inside each window sell the "windows not cards" reading at 64px+; they drop off at 16-32px where the cascade silhouette alone carries the semantic.
-    - **Build pipeline**: `docs/design/build-icons.ps1` rasterises the SVG via ImageMagick (`winget install ImageMagick.ImageMagick`) into `appicon.ico` (nested 16/24/32/48/64/128/256), `appicon-256.png`, `appicon-64.png`, `appicon-32.png`. Idempotent, checked into repo, one-liner to re-run after any SVG tweak.
-    - **Three hookup points**: `<ApplicationIcon>` in csproj (Explorer/Start menu/pinned shortcut exe icon), `<Window Icon="avares://.../appicon-256.png" />` in MainWindow.axaml (title-bar + running-taskbar), and `TrayIconService` (system tray icon while minimised). Generated binaries committed alongside the SVG so the release CI runner doesn't need ImageMagick.
-    - **Cleanup**: default `Assets/avalonia-logo.ico` removed (no remaining references).
+- 247 tests passing (237 + 10 new `UpdateOrchestratorTests`). 0 warnings, 0 errors.
+- All files ≤200 lines. `MainWindowViewModel` is 197 lines (3 lines of headroom), forced the `MainWindowUpdateViewModel` sub-VM extraction which happens to be the cleanest split anyway.
+- Local `vpk pack` produces a 51.8 MB Setup.exe + 49.4 MB full .nupkg + 49.4 MB Portable.zip in ~15 seconds. Warnings about unsigned binaries are expected (decision 6-a).
 
 ## v2.0 - ComeOnOver Integration
 - [ ] Native ComeOnOver desktop app detection and launch (when available)

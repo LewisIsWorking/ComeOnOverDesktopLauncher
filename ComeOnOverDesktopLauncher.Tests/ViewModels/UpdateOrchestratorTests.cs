@@ -126,13 +126,13 @@ public class UpdateOrchestratorTests
     }
 
     [Fact]
-    public void ApplyAndRestart_WhenReady_CallsServiceExactlyOnce()
+    public async Task ApplyAndRestart_WhenReady_CallsServiceExactlyOnce()
     {
         _service.CheckForUpdatesAsync()
             .Returns(new UpdateCheckResult(UpdateStatus.UpdateAvailable, LatestVersion: "1.10.1"));
         _service.DownloadUpdatesAsync(Arg.Any<IProgress<int>?>()).Returns(true);
         var sut = CreateSut();
-        sut.RunCheckAsync(autoCheckEnabled: true).GetAwaiter().GetResult();
+        await sut.RunCheckAsync(autoCheckEnabled: true);
 
         sut.ApplyAndRestart();
 

@@ -10,18 +10,28 @@ A launcher utility for the [ComeOnOver](https://comeonover.netlify.app) ecosyste
 - Each instance uses a fixed named slot, preserving your login session between launches
 - Name each instance (e.g. "Work", "Personal", "Research") - names persist between sessions
 - Live CPU, RAM and uptime monitoring per instance and combined totals - auto-refreshes every 5 seconds
+- Live thumbnail previews of each Claude window; click a thumbnail to enlarge
 - Open the ComeOnOver web app directly from the launcher
 - Minimises to system tray - always one click away
+- Auto-updates in the background - opt-out toggle if you prefer to manage updates manually
 
 ## Requirements
 
 - Windows 10/11
 - [Claude Desktop](https://claude.ai/download) installed via the Microsoft Store
-- No .NET installation required - download the self-contained `.exe` from Releases
+- No .NET installation required - the installer bundles everything
 
-## Download
+## Install
 
-Head to [Releases](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/releases) and download the latest `ComeOnOverDesktopLauncher-vX.X.X-win-x64.exe`.
+Head to [Releases](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/releases) and download the latest `ComeOnOverDesktopLauncher-win-Setup.exe`. Run it to install.
+
+The installer puts the launcher in `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\` (no UAC prompt needed) and creates both a Desktop shortcut and a Start Menu entry. Future updates download and install automatically in the background - you'll see a "Restart to install" prompt when a new version is ready, on your schedule.
+
+**First-install SmartScreen warning.** Because the installer isn't code-signed, Windows will show a blue "Windows protected your PC" dialog the first time you run it. Click **More info**, then **Run anyway**. This is a one-time thing; subsequent auto-updates don't re-trigger SmartScreen. Code signing is on the roadmap.
+
+**Upgrading from v1.9.x or earlier?** See [`docs/MIGRATION.md`](docs/MIGRATION.md) for a one-time migration from the old portable `.exe` to the new installer-based distribution.
+
+If you'd prefer a portable install, each release also ships a `ComeOnOverDesktopLauncher-win-Portable.zip` - extract and run `ComeOnOverDesktopLauncher.exe` directly. The portable version does not auto-update.
 
 ## Getting Started (from source)
 
