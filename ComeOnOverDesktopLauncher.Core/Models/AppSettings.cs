@@ -21,6 +21,25 @@ public class AppSettings
     public bool ThumbnailsEnabled { get; set; } = true;
 
     /// <summary>
+    /// When true, the launcher's poll tick periodically checks for a
+    /// new release via <see cref="Services.Interfaces.IAutoUpdateService"/>
+    /// and silently downloads any available update in the background.
+    /// On-by-default because auto-update is the whole point of the
+    /// v1.10.0 Velopack switch; the user's only opt-out is this
+    /// checkbox (exposed in <c>LaunchControlsPanel</c>). Persisted
+    /// because users who disable it expect that choice to stick across
+    /// restarts - losing the preference is worse than having it.
+    ///
+    /// <para>
+    /// Note: this setting only controls the check-and-download phase.
+    /// Applying the update (the actual restart) is always user-driven
+    /// via the "Restart to install" button in the update banner, per
+    /// the v1.10.0 UX spec (decision 4, option b).
+    /// </para>
+    /// </summary>
+    public bool AutoCheckForUpdates { get; set; } = true;
+
+    /// <summary>
     /// User-defined names for each slot. Key = slot number, value = display name.
     /// Falls back to "Instance N" when no name is set.
     /// </summary>

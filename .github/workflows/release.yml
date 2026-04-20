@@ -15,55 +15,76 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Velopack's `vpk upload github` uses git history to locate
+          # the previous release for delta package generation. Shallow
+          # clones miss old tags so fetch-depth: 0 is required.
+          fetch-depth: 0
 
       - name: Setup .NET
+        # actions/setup-dotnet@v4 downloads the requested SDK if not
+        # preinstalled on the runner, so we can target .NET 10 directly
+        # even before windows-latest has it baked into the image.
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
-
-      - name: Update target framework for CI
-        run: |
-          Get-ChildItem -Recurse -Filter "*.csproj" | ForEach-Object {
-            (Get-Content $_.FullName) -replace '<TargetFramework>net10.0</TargetFramework>', '<TargetFramework>net9.0</TargetFramework>' |
-            Set-Content $_.FullName
-          }
+          dotnet-version: '10.0.x'
 
       - name: Run tests
         run: dotnet test ComeOnOverDesktopLauncher.Tests/ComeOnOverDesktopLauncher.Tests.csproj --configuration Release
 
-      - name: Publish self-contained Windows exe
+      - name: Install Velopack CLI
+        # `vpk` is the Velopack packaging tool. We use it to produce the
+        # Setup.exe installer + full/delta .nupkg artefacts from a normal
+        # dotnet publish output. Installed globally so it's on PATH.
+        run: dotnet tool install -g vpk
+
+      - name: Compute Velopack package version
+        # Velopack rejects the 'v' prefix and requires semver2 — just
+        # strip the 'v' from the git tag (e.g. v1.10.0 -> 1.10.0).
+        id: version
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Packaging version: $version"
+
+      - name: Publish for Velopack packaging
+        # PublishSingleFile is explicitly false because Velopack needs a
+        # multi-file output (it packages individual assemblies into its
+        # delta-update format). Self-contained stays true so end users
+        # don't need .NET installed.
         run: |
           dotnet publish ComeOnOverDesktopLauncher/ComeOnOverDesktopLauncher.csproj `
             --configuration Release `
             --runtime win-x64 `
             --self-contained true `
             --output publish `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true
+            -p:PublishSingleFile=false
 
-      - name: Copy bare exe
-        run: Copy-Item publish\ComeOnOverDesktopLauncher.exe ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.exe
+      - name: Pack with Velopack
+        # Produces: Setup.exe (bootstrap installer), full .nupkg (complete
+        # app), delta .nupkg (diff from previous release - only present
+        # from v1.10.1 onwards). Shortcuts: Desktop + StartMenu per the
+        # v1.10.0 design decisions.
+        run: |
+          vpk pack `
+            --packId ComeOnOverDesktopLauncher `
+            --packVersion ${{ steps.version.outputs.version }} `
+            --packDir publish `
+            --mainExe ComeOnOverDesktopLauncher.exe `
+            --packTitle "ComeOnOver Desktop Launcher" `
+            --shortcuts "Desktop,StartMenu"
 
-      - name: Create release archive
-        run: Compress-Archive -Path publish\* -DestinationPath ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          name: ComeOnOver Desktop Launcher ${{ github.ref_name }}
-          body: |
-            ## Download
-            | File | Description |
-            |------|-------------|
-            | `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.exe` | Single executable — just download and run |
-            | `ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip` | Zip archive containing the same executable |
-
-            No .NET installation required — this is a self-contained executable.
-
-            ## What's New
-            See [ROADMAP.md](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/blob/master/ROADMAP.md) for details.
-          files: |
-            ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.exe
-            ComeOnOverDesktopLauncher-${{ github.ref_name }}-win-x64.zip
-          draft: false
-          prerelease: false
+      - name: Upload to GitHub Releases
+        # `vpk upload github` creates the GitHub release AND uploads all
+        # generated artefacts (Setup.exe, *.nupkg). Replaces the old
+        # softprops/action-gh-release step entirely. GITHUB_TOKEN is
+        # auto-injected by Actions so no new secrets are needed.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          vpk upload github `
+            --repoUrl https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher `
+            --publish `
+            --releaseName "ComeOnOver Desktop Launcher ${{ github.ref_name }}" `
+            --tag ${{ github.ref_name }}

@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
@@ -111,9 +110,7 @@ public partial class App : Application
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IVersionProvider, VersionProvider>();
-        services.AddSingleton<HttpClient>();
-        services.AddSingleton<IUpdateChecker, GitHubUpdateChecker>();
-        services.AddSingleton<IUpdateNotifier, UpdateNotifier>();
+        services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IWindowSnapshotService, WindowSnapshotService>();
         services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();

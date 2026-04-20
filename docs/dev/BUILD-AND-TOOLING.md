@@ -49,7 +49,7 @@ The GitHub Actions release workflow does NOT have ImageMagick installed. Always 
 
 ### .NET 10 on the CI runner
 
-The release workflow uses a `regex → net9.0` substitution in `.github/workflows/release.yml` because GitHub Actions doesn't have .NET 10 preinstalled yet. Don't remove that step.
+Historically the workflow did a `regex net10.0 → net9.0` substitution before `dotnet publish` because `windows-latest` runners didn't have .NET 10 preinstalled. In v1.10.0 we simplified this: `actions/setup-dotnet@v4` supports `dotnet-version: '10.0.x'` directly — the action downloads and installs the SDK when it's not preinstalled. No regex hack needed. The build now targets `net10.0` end-to-end.
 
 ## Commit message temp files — `.gitignore` them
 

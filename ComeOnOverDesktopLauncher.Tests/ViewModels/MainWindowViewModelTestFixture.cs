@@ -28,7 +28,7 @@ public class MainWindowViewModelTestFixture
     public IResourceMonitor ResourceMonitor { get; } = Substitute.For<IResourceMonitor>();
     public IStartupService StartupService { get; } = Substitute.For<IStartupService>();
     public IVersionProvider VersionProvider { get; } = Substitute.For<IVersionProvider>();
-    public IUpdateNotifier UpdateNotifier { get; } = Substitute.For<IUpdateNotifier>();
+    public IAutoUpdateService AutoUpdateService { get; } = Substitute.For<IAutoUpdateService>();
     public IClaudeVersionResolver ClaudeVersionResolver { get; } = Substitute.For<IClaudeVersionResolver>();
     public IProcessService ProcessService { get; } = Substitute.For<IProcessService>();
     public IWindowThumbnailService ThumbnailService { get; } = Substitute.For<IWindowThumbnailService>();
@@ -49,6 +49,8 @@ public class MainWindowViewModelTestFixture
     {
         SettingsService.Load().Returns(settings ?? new AppSettings { DefaultSlotCount = 2 });
         VersionProvider.GetVersion().Returns("1.3.0");
+        AutoUpdateService.CheckForUpdatesAsync()
+            .Returns(Task.FromResult(new UpdateCheckResult(UpdateStatus.NoUpdateAvailable)));
 
         var slotInstances = new SlotInstanceListViewModel(
             Scanner, Classifier, SlotInitialiser, Logger);
@@ -58,7 +60,7 @@ public class MainWindowViewModelTestFixture
         return new MainWindowViewModel(
             Launcher, CooService,
             SettingsService, PathResolver, ResourceMonitor,
-            StartupService, UpdateNotifier, VersionProvider,
+            StartupService, AutoUpdateService, VersionProvider,
             ClaudeVersionResolver, ProcessService, ThumbnailService, PreviewService,
             slotInstances, externalInstances, Logger);
     }

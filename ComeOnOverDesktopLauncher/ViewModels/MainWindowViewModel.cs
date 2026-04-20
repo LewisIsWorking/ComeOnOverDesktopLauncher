@@ -13,9 +13,11 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 /// Handles launching Claude instances, resource monitoring, startup
 /// toggle, update checks and ComeOnOver.
 ///
-/// Delegates the slot list to <see cref="SlotInstanceListViewModel"/>
-/// and the external list to <see cref="ExternalInstanceListViewModel"/>
-/// so each windowed Claude process appears in exactly one list.
+/// Delegates the slot list to <see cref="SlotInstanceListViewModel"/>,
+/// the external list to <see cref="ExternalInstanceListViewModel"/>,
+/// and the update banner state to <see cref="MainWindowUpdateViewModel"/>
+/// so this VM stays under the 200-line limit and each concern lives
+/// in its own testable unit.
 ///
 /// Launch sequencing lives inside <see cref="IClaudeInstanceLauncher.LaunchInstances"/>
 /// so this VM stays focused on UI orchestration. Every launch attempt
@@ -29,7 +31,6 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IStartupService _startupService;
-    private readonly IUpdateNotifier _updateNotifier;
     private readonly IProcessService _processService;
     private readonly IWindowThumbnailService _thumbnailService;
     private readonly IThumbnailPreviewService _previewService;
@@ -48,7 +49,6 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private double _totalCpuPercent;
     [ObservableProperty] private bool _launchOnStartup;
     [ObservableProperty] private int _refreshIntervalSeconds;
-    [ObservableProperty] private string? _updateAvailableMessage;
     [ObservableProperty] private bool _thumbnailsEnabled;
 
     public string AppVersion { get; }
@@ -58,6 +58,7 @@ public partial class MainWindowViewModel : ObservableObject
     public bool HasRunningInstances => RunningInstanceCount > 0;
     public SlotInstanceListViewModel SlotInstances { get; }
     public ExternalInstanceListViewModel ExternalInstances { get; }
+    public MainWindowUpdateViewModel Update { get; }
 
     public MainWindowViewModel(
         IClaudeInstanceLauncher launcher,
@@ -66,7 +67,7 @@ public partial class MainWindowViewModel : ObservableObject
         IClaudePathResolver pathResolver,
         IResourceMonitor resourceMonitor,
         IStartupService startupService,
-        IUpdateNotifier updateNotifier,
+        IAutoUpdateService autoUpdateService,
         IVersionProvider versionProvider,
         IClaudeVersionResolver claudeVersionResolver,
         IProcessService processService,
@@ -81,7 +82,6 @@ public partial class MainWindowViewModel : ObservableObject
         _settingsService = settingsService;
         _resourceMonitor = resourceMonitor;
         _startupService = startupService;
-        _updateNotifier = updateNotifier;
         _processService = processService;
         _thumbnailService = thumbnailService;
         _previewService = previewService;
@@ -102,12 +102,14 @@ public partial class MainWindowViewModel : ObservableObject
         SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, _previewService, SaveSettings, RefreshResources);
         SlotCallbackBinder.BindExternal(ExternalInstances, _previewService);
 
+        Update = new MainWindowUpdateViewModel(
+            autoUpdateService, _processService, _logger, _settings, SaveSettings);
+
         _refreshTimer = new DispatcherTimer
             { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };
         _refreshTimer.Tick += (_, _) => RefreshResources();
         _refreshTimer.Start();
         _logger.LogInfo($"MainWindowViewModel ready. ClaudeInstalled={_isClaudeInstalled}, SlotCount={_slotCount}");
-        _ = CheckForUpdates();
     }
 
     partial void OnLaunchOnStartupChanged(bool value)
@@ -185,10 +187,6 @@ public partial class MainWindowViewModel : ObservableObject
                 _thumbnailService, ExternalInstances.Items, 240, 150);
         }
     }
-
-    [RelayCommand]
-    private async Task CheckForUpdates() =>
-        UpdateAvailableMessage = await _updateNotifier.GetUpdateAvailableMessageAsync();
 
     [RelayCommand]
     private void SaveSettings()

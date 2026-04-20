@@ -8,3 +8,7 @@ TestResults/
 # Local-only commit message scratch files (see v1.8.0 regression)
 COMMIT_MSG.tmp
 *.commit.tmp
+
+# Velopack packaging output (vpk pack)
+publish/
+Releases/
