@@ -181,3 +181,19 @@ If any step fails, logs at `%APPDATA%\ComeOnOverDesktopLauncher\logs\launcher-YY
 ### Why fetch-depth: 0 in the workflow
 
 `vpk upload github` needs full git history to locate the previous release tag for delta package generation. Without `fetch-depth: 0` on `actions/checkout`, only the current tag is fetched and delta generation silently produces a full package instead. Delta packages are the whole point of the Velopack migration, so don't remove this.
+
+### `vpk upload github` needs `--token` explicitly, not `GITHUB_TOKEN` env var
+
+v1.10.0's initial CI run failed with `Value cannot be null. (Parameter 'token')` because we'd set `GITHUB_TOKEN` in the step's `env:` block expecting vpk to read it automatically (as most GitHub-hosted CLI tools do). It doesn't. vpk's Octokit client only reads the `--token` command-line argument. Pass `--token ${{ secrets.GITHUB_TOKEN }}` directly on the `vpk upload github` line.
+
+Symptom in the CI log:
+
+```
+[INF] Preparing to upload 3 asset(s) to GitHub
+[FTL] Value cannot be null. (Parameter 'token')
+System.ArgumentNullException
+  at Octokit.Ensure.ArgumentNotNull
+  at Velopack.Deployment.GitHubRepository.UploadMissingAssetsAsync
+```
+
+Good news: the token check happens BEFORE vpk creates the GitHub release, so a failure at this step leaves no orphaned release or draft behind. Delete the tag (local `git tag -d v1.10.0` + remote `git push --delete origin v1.10.0`), fix the workflow, re-tag cleanly.
