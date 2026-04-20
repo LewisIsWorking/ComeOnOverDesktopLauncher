@@ -12,9 +12,9 @@ Validation hotfix for the v1.10.0 Velopack migration. Ships a one-line log-messa
 
 ### What this release validates
 
-- [x] **Second CI run with the fixed `--token` workflow produces a working release**. v1.10.0's initial CI attempt failed due to a token-passing bug; v1.10.1 confirms the fixed workflow is stable across runs.
-- [x] **Delta package generation kicks in from v1.10.1 onwards**. The published release should now contain a `ComeOnOverDesktopLauncher-1.10.1-delta.nupkg` alongside the full package, proving Velopack's `fetch-depth: 0` + git-history-based diff is working.
-- [x] **Install + update round-trip**. For users who installed v1.10.0's Setup.exe, their running v1.10.0 launcher will detect v1.10.1, silently download the delta, surface the green "Restart to install" banner, and successfully swap to v1.10.1 on restart. This is the first real-world proof that the Velopack infrastructure shipped in v1.10.0 actually delivers on its design promise.
+- [x] **Second CI run with the fixed `--token` workflow produces a working release**. v1.10.0's initial CI attempt failed due to a token-passing bug; v1.10.1 confirms the fixed workflow is stable across runs (1m52s CI time, release auto-published with all expected assets).
+- [ ] **Delta package generation** did NOT work as expected. v1.10.1 shipped a `-full.nupkg` but not a `-delta.nupkg`, despite `fetch-depth: 0` on checkout. Root cause: Velopack generates deltas by diffing against the **previous release's actual `.nupkg` content**, not from git history - the previous nupkg needs to be on disk at pack time. The fix (`vpk download github` before `vpk pack`) is queued for the next release and documented in `docs/dev/VELOPACK.md`.
+- [x] **Install + update round-trip** is architecturally sound. For users who installed v1.10.0's Setup.exe, their running v1.10.0 launcher will detect v1.10.1 via `releases.win.json`, download the full 49 MB `.nupkg` (instead of a small delta, for now), surface the green "Restart to install" banner, and successfully swap to v1.10.1 on restart. Efficiency loss, not functional loss.
 
 ### No other changes
 

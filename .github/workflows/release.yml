@@ -38,6 +38,22 @@ jobs:
         # dotnet publish output. Installed globally so it's on PATH.
         run: dotnet tool install -g vpk
 
+      - name: Download previous release for delta generation
+        # Velopack needs the previous release's .nupkg on disk at pack
+        # time to generate a delta against it. Without this, `vpk pack`
+        # silently produces full packages only - auto-update still works
+        # but clients download the full ~49 MB .nupkg every time instead
+        # of a small diff.
+        #
+        # continue-on-error is required for the first-ever Velopack
+        # release in a repo (nothing to download yet). From the second
+        # release onwards, this step succeeds and populates Releases/.
+        run: |
+          vpk download github `
+            --repoUrl https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher `
+            --token ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
       - name: Compute Velopack package version
         # Velopack rejects the 'v' prefix and requires semver2 — just
         # strip the 'v' from the git tag (e.g. v1.10.0 -> 1.10.0).

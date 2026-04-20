@@ -6,7 +6,8 @@ Read this FIRST at the start of any CoODL session. Add to it whenever a lesson i
 
 ## Companion docs
 
-- **`docs/dev/BUILD-AND-TOOLING.md`** — line-count audit, PowerShell / heredoc quirks, commit-message workflow, CI runner gotchas, screenshot workflow, UI-Automation snippets, the release checklist, Velopack packaging, code-signing future plans.
+- **`docs/dev/BUILD-AND-TOOLING.md`** — line-count audit, PowerShell / heredoc quirks, commit-message workflow, CI runner gotchas, screenshot workflow, UI-Automation snippets, the release checklist.
+- **`docs/dev/VELOPACK.md`** (v1.10.0+) — Velopack packaging + auto-update CI pipeline: local `vpk pack` commands, the `PublishSingleFile=false` and `fetch-depth: 0` invariants, the `--token` gotcha, delta-package generation via `vpk download github`, post-ship validation strategy, code-signing future plans.
 - **`docs/dev/REFACTOR-AND-XAML.md`** — NSubstitute / fixture gotchas, Avalonia compiled-binding pitfalls (`string` -> `Color`, `Tapped` vs `PointerPressed`, `IsHitTestVisible` on child images/overlays), WMI scanner Electron quirk, close-to-tray process state, clipboard bitmap capture.
 - **`docs/MIGRATION.md`** — user-facing v1.9.x -> v1.10.0 migration guide (portable .exe -> Setup.exe + auto-update).
 
