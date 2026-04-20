@@ -130,6 +130,27 @@
                             VerticalAlignment="Center"/>
                 </Grid>
             </Border>
+
+            <!-- ApplyFailed: red banner + download installer link.
+                 Surfaces the v1.10.4+ detection of Velopack silently
+                 reverting an apply failure. See IUpdateApplyFailureDetector. -->
+            <Border Background="#1AE57373" CornerRadius="4" Padding="10,6"
+                    IsVisible="{Binding Update.IsApplyFailed}">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding Update.ApplyFailedBannerText}"
+                               Foreground="#E57373" FontSize="11"
+                               VerticalAlignment="Center"
+                               TextWrapping="Wrap"/>
+                    <Button Grid.Column="1"
+                            Content="Download installer"
+                            Command="{Binding Update.DownloadInstallerCommand}"
+                            FontSize="11"
+                            Padding="8,2"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="Opens the Setup.exe download in your browser. Running Setup.exe fresh usually works even when the in-app Restart flow can't (different file-locking characteristics). Alternatively, reboot your machine first and try Restart again."/>
+                </Grid>
+            </Border>
         </StackPanel>
 
     </StackPanel>

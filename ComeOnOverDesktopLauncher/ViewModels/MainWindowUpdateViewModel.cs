@@ -39,21 +39,29 @@ public partial class MainWindowUpdateViewModel : ObservableObject
     public bool IsDownloading => State == UpdateUiState.Downloading;
     public bool IsReadyToInstall => State == UpdateUiState.ReadyToInstall;
     public bool IsFailed => State == UpdateUiState.Failed;
+    public bool IsApplyFailed => State == UpdateUiState.ApplyFailed;
     public string ReadyBannerText => LatestVersion is null
         ? "Update ready - restart to install"
         : $"v{LatestVersion} ready - restart to install";
     public string DownloadingBannerText => LatestVersion is null
         ? $"Downloading update... {DownloadProgress}%"
         : $"Downloading v{LatestVersion}... {DownloadProgress}%";
+    public string ApplyFailedBannerText => LatestVersion is null
+        ? "Update didn't apply. Reboot and try again, or download the installer."
+        : $"Update to v{LatestVersion} didn't apply. Reboot and try again, or download the installer.";
     public string ReleaseNotesUrl => LatestVersion is null
         ? $"{GithubRepoBase}/releases"
         : $"{GithubRepoBase}/releases/tag/v{LatestVersion}";
+    public string DownloadInstallerUrl => LatestVersion is null
+        ? $"{GithubRepoBase}/releases/latest"
+        : $"{GithubRepoBase}/releases/download/v{LatestVersion}/ComeOnOverDesktopLauncher-win-Setup.exe";
 
     public MainWindowUpdateViewModel(
         IAutoUpdateService autoUpdateService,
         IProcessService processService,
         ILoggingService logger,
         AppSettings settings,
+        IUpdateApplyFailureDetector applyFailureDetector,
         Action onSettingsChanged)
     {
         _processService = processService;
@@ -63,6 +71,14 @@ public partial class MainWindowUpdateViewModel : ObservableObject
             onStateChanged: s => Dispatcher.UIThread.Post(() => State = s),
             onProgressChanged: p => Dispatcher.UIThread.Post(() => DownloadProgress = p),
             onLatestVersionChanged: v => Dispatcher.UIThread.Post(() => LatestVersion = v));
+
+        // v1.10.4+: check on construction for a recent Velopack apply
+        // failure. 2-minute window covers the typical 15-second apply
+        // attempt plus launcher startup lag. If detected, jump
+        // straight into ApplyFailed state so the user sees the
+        // recovery banner before any other update-check activity.
+        if (applyFailureDetector.ApplyFailedRecently(TimeSpan.FromMinutes(2)))
+            _orchestrator.MarkApplyFailed();
 
         _checkTimer = new DispatcherTimer { Interval = TimeSpan.FromHours(6) };
         _checkTimer.Tick += async (_, _) => await CheckAsync();
@@ -82,13 +98,16 @@ public partial class MainWindowUpdateViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDownloading));
         OnPropertyChanged(nameof(IsReadyToInstall));
         OnPropertyChanged(nameof(IsFailed));
+        OnPropertyChanged(nameof(IsApplyFailed));
     }
 
     partial void OnLatestVersionChanged(string? value)
     {
         OnPropertyChanged(nameof(ReadyBannerText));
         OnPropertyChanged(nameof(DownloadingBannerText));
+        OnPropertyChanged(nameof(ApplyFailedBannerText));
         OnPropertyChanged(nameof(ReleaseNotesUrl));
+        OnPropertyChanged(nameof(DownloadInstallerUrl));
     }
 
     partial void OnDownloadProgressChanged(int value) =>
@@ -106,4 +125,8 @@ public partial class MainWindowUpdateViewModel : ObservableObject
     [RelayCommand]
     private void OpenReleaseNotes() =>
         _processService.Start(ReleaseNotesUrl, string.Empty, useShellExecute: true);
+
+    [RelayCommand]
+    private void DownloadInstaller() =>
+        _processService.Start(DownloadInstallerUrl, string.Empty, useShellExecute: true);
 }

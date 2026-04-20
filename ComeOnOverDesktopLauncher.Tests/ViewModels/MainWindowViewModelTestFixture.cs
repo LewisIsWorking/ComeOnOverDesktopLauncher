@@ -29,6 +29,7 @@ public class MainWindowViewModelTestFixture
     public IStartupService StartupService { get; } = Substitute.For<IStartupService>();
     public IVersionProvider VersionProvider { get; } = Substitute.For<IVersionProvider>();
     public IAutoUpdateService AutoUpdateService { get; } = Substitute.For<IAutoUpdateService>();
+    public IUpdateApplyFailureDetector ApplyFailureDetector { get; } = Substitute.For<IUpdateApplyFailureDetector>();
     public IClaudeVersionResolver ClaudeVersionResolver { get; } = Substitute.For<IClaudeVersionResolver>();
     public IProcessService ProcessService { get; } = Substitute.For<IProcessService>();
     public IWindowThumbnailService ThumbnailService { get; } = Substitute.For<IWindowThumbnailService>();
@@ -60,7 +61,7 @@ public class MainWindowViewModelTestFixture
         return new MainWindowViewModel(
             Launcher, CooService,
             SettingsService, PathResolver, ResourceMonitor,
-            StartupService, AutoUpdateService, VersionProvider,
+            StartupService, AutoUpdateService, ApplyFailureDetector, VersionProvider,
             ClaudeVersionResolver, ProcessService, ThumbnailService, PreviewService,
             slotInstances, externalInstances, Logger);
     }

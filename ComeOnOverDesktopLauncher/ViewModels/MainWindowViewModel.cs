@@ -68,6 +68,7 @@ public partial class MainWindowViewModel : ObservableObject
         IResourceMonitor resourceMonitor,
         IStartupService startupService,
         IAutoUpdateService autoUpdateService,
+        IUpdateApplyFailureDetector applyFailureDetector,
         IVersionProvider versionProvider,
         IClaudeVersionResolver claudeVersionResolver,
         IProcessService processService,
@@ -103,7 +104,8 @@ public partial class MainWindowViewModel : ObservableObject
         SlotCallbackBinder.BindExternal(ExternalInstances, _previewService);
 
         Update = new MainWindowUpdateViewModel(
-            autoUpdateService, _processService, _logger, _settings, SaveSettings);
+            autoUpdateService, _processService, _logger, _settings,
+            applyFailureDetector, SaveSettings);
 
         _refreshTimer = new DispatcherTimer
             { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };

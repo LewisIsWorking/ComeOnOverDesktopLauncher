@@ -2,6 +2,42 @@
 
 Current and upcoming work. Historical release notes for v1.0-v1.8.x live in [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md).
 
+## v1.10.4 - Released
+
+Surfaces the v1.10.2 -> v1.10.3 apply-failure bug to users so the "restart did nothing" symptom stops being silent. Doesn't fix the underlying Velopack/Defender race condition — that remains a framework limitation — but ends the confusion of clicking Restart and having the banner reappear as if nothing happened.
+
+### New `IUpdateApplyFailureDetector` service
+
+- [x] **Reads the tail of `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\velopack.log` on startup** (last 16 KB, fast) and scans for `[ERROR] Apply error:` lines with timestamps within a configurable window (wired to 2 minutes).
+- [x] **Never throws** — any IO or parse error collapses to `false` (fail closed). Better to miss a detection than crash the launcher at startup.
+- [x] **Handles midnight rollover** — Velopack logs only `HH:MM:SS` with no date; the detector tries "today" first, falls back to "yesterday" if today's timestamp would be in the future.
+- [x] **Reads tail only** for efficiency — production logs on Lewis's machine are already >130 KB after a day of use. Scanning the whole file every startup would waste time; the last 16 KB is plenty because the log is append-only and recent entries are at the end.
+- [x] **Tested against real production data** — the regex correctly matches all 8 apply-error entries Lewis's machine generated during the 2026-04-20 investigation.
+
+### New `UpdateUiState.ApplyFailed` state
+
+- [x] `UpdateOrchestrator.MarkApplyFailed()` transitions the state machine directly. Called once at `MainWindowUpdateViewModel` construction if the detector returns true. Distinct from the existing `Failed` state because the UI actions differ (ApplyFailed offers the "Download installer" escape hatch; generic Failed just offers Retry).
+- [x] New red banner in `LaunchControlsPanel.axaml` (`#1AE57373` background, `#E57373` foreground) with context-sensitive text:
+  - With version: "Update to vX.Y.Z didn't apply. Reboot and try again, or download the installer."
+  - Without version: "Update didn't apply. Reboot and try again, or download the installer."
+- [x] "Download installer" button opens the Setup.exe URL for the target version in the user's default browser (tooltip explains that fresh install usually succeeds where Restart failed, and reboot is the other good option).
+
+### Tests
+
+- [x] 8 new tests in `VelopackLogApplyFailureDetectorTests` using real temp files so the tail-reading logic is exercised end-to-end. Cover: no log file, recent error, old error, log with no apply error, multiple errors (picks most recent), midnight rollover edge case, IO exception safety, large log (tail-read correctness).
+- [x] Existing tests kept in sync via `MainWindowViewModelTestFixture` update (adds `ApplyFailureDetector` mock field, updates constructor call).
+- [x] Total: 263 tests passing (was 255).
+
+### Known limitation: adoption chicken-and-egg
+
+Users currently stuck on v1.10.2/v1.10.3 because their apply keeps failing won't receive v1.10.4 for the same reason. They need to either reboot (clears file locks) and retry, or download Setup.exe manually. Once v1.10.4 lands successfully, any future apply failure will surface the banner immediately. Documented in `docs/dev/LEARNINGS.md`.
+
+### Numbers
+
+- 4 files added (`IUpdateApplyFailureDetector`, `VelopackLogApplyFailureDetector`, tests, XAML banner). 5 files modified (`UpdateOrchestrator`, `MainWindowUpdateViewModel`, `MainWindowViewModel`, `App.axaml.cs`, `MainWindowViewModelTestFixture`).
+- All files ≤200 lines. **`MainWindowViewModel.cs` is at 199 lines — the next change to it must extract to a new sub-VM** (pattern established by `MainWindowUpdateViewModel`, `SlotInstanceListViewModel`, `ExternalInstanceListViewModel`).
+- 0 warnings, 0 errors.
+
 ## v1.10.3 - Released
 
 Follow-up to v1.10.2's `IShortcutHealer`. On Lewis's machine after v1.10.2 shipped, Windows' icon cache continued to show a generic document icon for the freshly-healed Start Menu shortcut until a manual `explorer.exe` restart. v1.10.3 adds an automatic icon-cache refresh to the heal flow so users never see a broken-looking icon.
@@ -154,21 +190,8 @@ The plumbing release. No new end-user features; instead, the entire distribution
 - [ ] Ads will never appear in v1.x - planned for a later major version once the user base is established
 
 ## Backlog / Under Consideration
-- [ ] **[TOP PRIORITY] Reproducible "file in use" failure when applying Velopack update** — escalated from "transient" to confirmed reproducible after further investigation 2026-04-20. **THREE consecutive attempts** on Lewis's machine all failed identically when applying v1.10.2 → v1.10.3: Velopack's `Update.exe apply` retries the backup operation 10 times at 1s intervals, every retry hits `Os { code: 32, ... "The process cannot access the file because it is being used by another process." }`, then gives up and silently relaunches the OLD version. The user sees the update banner reappear — appears as if restart-to-install simply doesn't work. Even **`Setup.exe --silent` fails** with the same root cause because it uses the same Velopack apply logic.
 
-    Diagnostic evidence collected via Sysinternals `handle.exe`: when the launcher is not running, no process holds handles in the install dir. This means the lock is grabbed *during* Velopack's 2-second window between extracting 237 files into VelopackTemp and calling the backup-and-swap. Most likely culprit: Windows Defender real-time scanning the newly-written files. Rider's indexing was ruled out — its handles are all inside its own JetBrains folders.
-
-    This is a ship-blocker for the v1.10.x update pipeline — any user who hits it cannot update through the in-app flow AND cannot recover via Setup.exe. Users currently on v1.10.0/v1.10.1/v1.10.2 may be stuck.
-
-    Three fix options, in priority order:
-
-    - **(b) Surface the failure in a banner** — recommended next ship as v1.10.4. Detect `[ERROR] Apply error:` entries in `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\velopack.log` on startup (timestamp within last 2 minutes = just happened). Show an amber banner "Update to vX.Y.Z failed. Download the installer manually to update." with a button that opens the GitHub releases page for the latest version. Also a "Try again" button that retries the apply. Implementation sketch: new `IUpdateApplyFailureDetector` interface + `VelopackLogApplyFailureDetector` implementation (reads tail of log file, never throws). New `UpdateStatus.ApplyFailed` state in the state machine. Small XAML addition to the existing failed-banner block (context-sensitive text). Full design captured in the planning work for v1.10.4. **This doesn't fix the underlying race, but it removes the silent-revert UX bug and gives users a working escape hatch.**
-
-    - **(a) Increase Velopack retry count/interval** — investigation only. Check whether `vpk pack` options or newer Velopack versions (0.0.1299+) expose a `--retry-count` or `--retry-interval` flag. Current behaviour is hardcoded 10 retries at 1s; bumping to 30 retries at 2s might cover the entire Defender scan window on most machines. Low-cost if exposed; skip if it requires forking Velopack.
-
-    - **(c) Defender exclusion in installer** — low priority. Could add a post-install step asking Windows to add `%LOCALAPPDATA%\ComeOnOverDesktopLauncher` to Defender's exclusion list via `Add-MpPreference`, but this requires admin and raises trust questions (apps asking for AV exclusions is a common malware pattern). Not recommended.
-
-    Tested workarounds for users currently hitting the bug: (1) kill the launcher entirely, wait 30+ seconds, launch again, attempt restart — **confirmed NOT reliable** on Lewis's machine (3 attempts all failed). (2) Reboot the machine, launch, attempt restart — untested, likely works because all file handles reset. (3) Uninstall and reinstall from Setup.exe — untested, but the nuclear option. Full apply-failure trace preserved at user's `velopack.log`; lines 856, 932, 1018 for the three observed failures.
+- [ ] **Investigate Velopack retry-count configuration** — the 10×1s backup-retry window that caused the v1.10.2 → v1.10.3 failures is hardcoded in Velopack 0.0.1298. Check if `vpk pack` exposes a flag to raise it, or whether newer Velopack versions (0.0.1299+) default to a longer window. Even 30×2s would cover most Defender scan durations. Low-priority because the v1.10.4 banner now gives users a clean escape hatch — this would be a quality-of-life improvement on top.
 
 - [ ] **Claude usage tracker + cooldown timer** — surface the data from [claude.ai/settings/usage](https://claude.ai/settings/usage) directly in the launcher so users don't have to alt-tab into the web UI to see their current session %, weekly limits, resets, or extra-usage spend. Also an independently-useful cooldown timer per slot showing how long until the 5-hour rolling window resets (valuable because users hitting the session limit currently have to read Claude's own in-app message then mentally track the countdown). Three implementation paths, each with tradeoffs:
     - **Embedded WebView approach**: host an Avalonia `WebView` (CefNet or the platform's WebView2) pointed at `claude.ai/settings/usage`. User logs in once (session cookie persists). No parsing required. Downsides: WebView adds ~100 MB to the launcher install, complex slot-independent auth (which account's usage?), and the existing settings page isn't designed to be embedded (responsive-design quirks at narrow widths).

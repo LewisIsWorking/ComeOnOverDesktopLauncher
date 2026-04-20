@@ -133,6 +133,25 @@ public class UpdateOrchestrator
             TransitionTo(UpdateUiState.Idle);
     }
 
+    /// <summary>
+    /// Transitions directly to <see cref="UpdateUiState.ApplyFailed"/>.
+    /// Called once at startup when
+    /// <see cref="IUpdateApplyFailureDetector"/> confirms a recent
+    /// apply failure (Velopack silently relaunched the old exe after
+    /// an apply failure - see docs/dev/LEARNINGS.md). Distinct from
+    /// <see cref="UpdateUiState.Failed"/> (check/download network
+    /// failure) because the UI surfaces different recovery options
+    /// - ApplyFailed offers a "Download installer" escape hatch.
+    /// </summary>
+    public void MarkApplyFailed()
+    {
+        _logger.LogWarning(
+            "UpdateOrchestrator: transitioning to ApplyFailed " +
+            "(Velopack apply failure detected in log). User will see " +
+            "recovery banner with 'Download installer' option.");
+        TransitionTo(UpdateUiState.ApplyFailed);
+    }
+
     private async Task DownloadAsync()
     {
         TransitionTo(UpdateUiState.Downloading);
@@ -161,5 +180,11 @@ public enum UpdateUiState
     Checking,
     Downloading,
     ReadyToInstall,
-    Failed
+    Failed,
+    /// <summary>v1.10.4+: Velopack silently failed to apply a
+    /// previously-downloaded update (e.g. AV scan held file locks
+    /// during backup-and-swap). Detected by reading the tail of
+    /// velopack.log at startup. UI shows a recovery banner with
+    /// instructions to reboot or download the installer manually.</summary>
+    ApplyFailed
 }
