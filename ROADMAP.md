@@ -32,6 +32,12 @@ Velopack 0.0.1298 is the bug's source but a Velopack fix (a) may take weeks, (b)
 - All files ≤200 lines.
 - Local `vpk pack` unchanged (no CI changes, no new Velopack behaviour).
 
+### Observed end-to-end (2026-04-20)
+
+- [x] v1.10.1 -> v1.10.2 auto-update delivered the delta package (89 KB, not the full 49 MB).
+- [x] After the update applied, v1.10.2 launched and logged `[HealIfMissing] Shortcut heal: already present` - the healer's `AlreadyPresent` branch fired correctly because the shortcut was manually restored earlier in the session. A fresh install that hits the Velopack shortcut bug would instead log `Shortcut heal: missing at ... - recreating` followed by `Created shortcut`.
+- [x] First Velopack delta package in the project's history (see also the `vpk download github` step added in commit `6eae3db` - it kicked in on this second release).
+
 ## v1.10.1 - Released
 
 Validation hotfix for the v1.10.0 Velopack migration. Ships a one-line log-message enrichment purely so the auto-update pipeline can be exercised end-to-end: v1.10.0 users should receive this release automatically on their next poll tick (up to 6 hours) or next launcher restart.
