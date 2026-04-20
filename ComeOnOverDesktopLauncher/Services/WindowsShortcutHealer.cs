@@ -36,14 +36,19 @@ public class WindowsShortcutHealer : IShortcutHealer
     private const string ShortcutFileName = "ComeOnOver Desktop Launcher.lnk";
 
     private readonly IShellLinkWriter _writer;
+    private readonly IIconCacheRefresher _iconCacheRefresher;
     private readonly ILoggingService _logger;
     private readonly Func<string> _getRunningExePath;
     private readonly Func<string, bool> _fileExists;
 
     /// <summary>Default constructor for DI - wires in the real
     /// running-exe lookup and <see cref="File.Exists"/>.</summary>
-    public WindowsShortcutHealer(IShellLinkWriter writer, ILoggingService logger)
-        : this(writer, logger, ResolveRunningExePath, File.Exists) { }
+    public WindowsShortcutHealer(
+        IShellLinkWriter writer,
+        IIconCacheRefresher iconCacheRefresher,
+        ILoggingService logger)
+        : this(writer, iconCacheRefresher, logger,
+            ResolveRunningExePath, File.Exists) { }
 
     /// <summary>Testing-seam constructor - lets unit tests substitute
     /// a fixed "running exe path" and a mock file-existence probe so
@@ -51,11 +56,13 @@ public class WindowsShortcutHealer : IShortcutHealer
     /// state or matching Velopack install layout.</summary>
     public WindowsShortcutHealer(
         IShellLinkWriter writer,
+        IIconCacheRefresher iconCacheRefresher,
         ILoggingService logger,
         Func<string> getRunningExePath,
         Func<string, bool> fileExists)
     {
         _writer = writer;
+        _iconCacheRefresher = iconCacheRefresher;
         _logger = logger;
         _getRunningExePath = getRunningExePath;
         _fileExists = fileExists;
@@ -93,7 +100,16 @@ public class WindowsShortcutHealer : IShortcutHealer
                 $"Shortcut heal: missing at '{lnkPath}' - recreating " +
                 $"(see docs/dev/VELOPACK.md for Velopack bug context)");
             var ok = _writer.TryCreateShortcut(lnkPath, expectedExe, ShortcutDescription);
-            return ok ? ShortcutHealResult.HealedMissing : ShortcutHealResult.Failed;
+            if (!ok) return ShortcutHealResult.Failed;
+
+            // v1.10.3+: ask Windows to refresh its icon cache so the
+            // newly-created shortcut immediately shows the app icon
+            // rather than a generic document icon (observed on
+            // Lewis's machine 2026-04-20). Only fires on this branch
+            // because AlreadyPresent / SkippedDevBuild haven't changed
+            // anything on disk that would need refreshing.
+            _iconCacheRefresher.RefreshShortcutIcons();
+            return ShortcutHealResult.HealedMissing;
         }
         catch (Exception ex)
         {

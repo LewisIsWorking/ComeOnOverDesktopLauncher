@@ -24,6 +24,7 @@ namespace ComeOnOverDesktopLauncher.Tests.Services;
 public class WindowsShortcutHealerTests
 {
     private readonly IShellLinkWriter _writer = Substitute.For<IShellLinkWriter>();
+    private readonly IIconCacheRefresher _refresher = Substitute.For<IIconCacheRefresher>();
     private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
 
     private static string ExpectedInstalledExe =>
@@ -41,7 +42,7 @@ public class WindowsShortcutHealerTests
     public void HealIfMissing_RunningFromDevBuild_SkipsWithoutTouchingDisk()
     {
         var sut = new WindowsShortcutHealer(
-            _writer, _logger,
+            _writer, _refresher, _logger,
             getRunningExePath: () => @"C:\code\CoODL\bin\Debug\net10.0\ComeOnOverDesktopLauncher.exe",
             fileExists: _ => throw new InvalidOperationException(
                 "file-exists probe should not be invoked on dev build"));
@@ -50,13 +51,14 @@ public class WindowsShortcutHealerTests
 
         Assert.Equal(ShortcutHealResult.SkippedDevBuild, result);
         _writer.DidNotReceiveWithAnyArgs().TryCreateShortcut(default!, default!, default!);
+        _refresher.DidNotReceive().RefreshShortcutIcons();
     }
 
     [Fact]
     public void HealIfMissing_ShortcutPresent_ReportsAlreadyPresentAndDoesNotWrite()
     {
         var sut = new WindowsShortcutHealer(
-            _writer, _logger,
+            _writer, _refresher, _logger,
             getRunningExePath: () => ExpectedInstalledExe,
             fileExists: path => path == ExpectedShortcutPath);
 
@@ -64,15 +66,16 @@ public class WindowsShortcutHealerTests
 
         Assert.Equal(ShortcutHealResult.AlreadyPresent, result);
         _writer.DidNotReceiveWithAnyArgs().TryCreateShortcut(default!, default!, default!);
+        _refresher.DidNotReceive().RefreshShortcutIcons();
     }
 
     [Fact]
-    public void HealIfMissing_ShortcutMissingAndWriterSucceeds_HealsMissing()
+    public void HealIfMissing_ShortcutMissingAndWriterSucceeds_HealsMissingAndRefreshesIconCache()
     {
         _writer.TryCreateShortcut(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(true);
         var sut = new WindowsShortcutHealer(
-            _writer, _logger,
+            _writer, _refresher, _logger,
             getRunningExePath: () => ExpectedInstalledExe,
             fileExists: _ => false);
 
@@ -83,21 +86,28 @@ public class WindowsShortcutHealerTests
             ExpectedShortcutPath,
             ExpectedInstalledExe,
             "ComeOnOver Desktop Launcher");
+        // v1.10.3: after a successful heal the icon cache must be
+        // flushed so the new .lnk renders with the app icon rather
+        // than the generic document icon (the bug that motivated
+        // this whole service).
+        _refresher.Received(1).RefreshShortcutIcons();
     }
 
     [Fact]
-    public void HealIfMissing_ShortcutMissingAndWriterFails_ReturnsFailed()
+    public void HealIfMissing_ShortcutMissingAndWriterFails_ReturnsFailedWithoutRefreshing()
     {
         _writer.TryCreateShortcut(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(false);
         var sut = new WindowsShortcutHealer(
-            _writer, _logger,
+            _writer, _refresher, _logger,
             getRunningExePath: () => ExpectedInstalledExe,
             fileExists: _ => false);
 
         var result = sut.HealIfMissing();
 
         Assert.Equal(ShortcutHealResult.Failed, result);
+        // Nothing was written, so there's nothing to refresh.
+        _refresher.DidNotReceive().RefreshShortcutIcons();
     }
 
     [Fact]
@@ -107,7 +117,7 @@ public class WindowsShortcutHealerTests
         // filesystems are case-insensitive. Healer must not false-
         // negative on case-only drift.
         var sut = new WindowsShortcutHealer(
-            _writer, _logger,
+            _writer, _refresher, _logger,
             getRunningExePath: () => ExpectedInstalledExe.ToUpperInvariant(),
             fileExists: _ => true);
 
@@ -120,7 +130,7 @@ public class WindowsShortcutHealerTests
     public void HealIfMissing_RunningExeProbeThrows_CollapsesToFailedNotPropagated()
     {
         var sut = new WindowsShortcutHealer(
-            _writer, _logger,
+            _writer, _refresher, _logger,
             getRunningExePath: () => throw new InvalidOperationException("probe failed"),
             fileExists: _ => true);
 

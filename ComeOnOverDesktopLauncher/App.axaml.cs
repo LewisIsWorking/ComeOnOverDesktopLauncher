@@ -119,6 +119,7 @@ public partial class App : Application
         services.AddSingleton<IVersionProvider, VersionProvider>();
         services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();
         services.AddSingleton<IShellLinkWriter, WScriptShellLinkWriter>();
+        services.AddSingleton<IIconCacheRefresher, WindowsIconCacheRefresher>();
         services.AddSingleton<IShortcutHealer, WindowsShortcutHealer>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IWindowSnapshotService, WindowSnapshotService>();

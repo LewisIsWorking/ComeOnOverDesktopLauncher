@@ -2,6 +2,25 @@
 
 Current and upcoming work. Historical release notes for v1.0-v1.8.x live in [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md).
 
+## v1.10.3 - Released
+
+Follow-up to v1.10.2's `IShortcutHealer`. On Lewis's machine after v1.10.2 shipped, Windows' icon cache continued to show a generic document icon for the freshly-healed Start Menu shortcut until a manual `explorer.exe` restart. v1.10.3 adds an automatic icon-cache refresh to the heal flow so users never see a broken-looking icon.
+
+### New `IIconCacheRefresher` service
+
+- [x] **`IIconCacheRefresher.RefreshShortcutIcons()`** - thin wrapper around `ie4uinit.exe -show` (Microsoft's documented icon-cache flush command, pre-installed on every Windows version, lighter-weight than killing `explorer.exe`).
+- [x] **`WindowsIconCacheRefresher`** delegates the actual process spawn to the existing `IProcessService` for unit-testability. Never throws; a failed refresh is logged as a warning and the shortcut remains correct, just temporarily missing an icon.
+- [x] **`WindowsShortcutHealer` updated** to call `RefreshShortcutIcons()` **only on the `HealedMissing` branch**. `AlreadyPresent` and `SkippedDevBuild` do nothing on disk, so invoking the refresh would be pointless work (and a tiny but real cost on every launcher startup).
+- [x] **2 new tests** in `WindowsIconCacheRefresherTests`: correct invocation of `ie4uinit.exe -show`, exception-safety (caller's crashed process service must not propagate out and break the calling healer).
+- [x] **Existing `WindowsShortcutHealerTests` updated** to inject the refresher mock and assert it is called exactly once on `HealedMissing`, never on `AlreadyPresent`, never on `SkippedDevBuild`, and never on `Failed` (no heal happened, nothing to refresh).
+
+### Numbers
+
+- 255 tests passing (253 + 2 new). 0 warnings, 0 errors.
+- 2 files added (`IIconCacheRefresher`, `WindowsIconCacheRefresher`). 3 files modified (`WindowsShortcutHealer`, its test file, `App.axaml.cs` DI).
+- All files ≤200 lines.
+- Dev-run smoke test: healer still correctly returns `SkippedDevBuild` without invoking the refresher (no "Requested icon-cache refresh" log line).
+
 ## v1.10.2 - Released
 
 User-visible fix for the Start Menu shortcut regression observed during the first real-world v1.10.0 → v1.10.1 auto-update. Velopack 0.0.1298's update apply logged success for the Start Menu `.lnk` but left the Programs folder empty; Windows Search could not find the app. v1.10.2 self-heals on startup.
@@ -141,8 +160,6 @@ The plumbing release. No new end-user features; instead, the entire distribution
     - **Local cooldown timer only (no remote data)**: track prompt-sent events locally per slot (scan Claude's IPC or use window-title changes as a proxy), count down 5 hours from first prompt in the current window. Doesn't show the %-used or weekly limits, but delivers the most user-requested piece ("when can I prompt again?") with zero network dependency and zero maintenance risk. Fallback approach if (1) and (2) are both too expensive.
 
     Start with the local-only cooldown timer as an MVP (adds a small timer label to each slot card), then optionally layer on the remote usage stats later if Anthropic publishes a public API or the reverse-engineered one proves stable. Settings toggle `AppSettings.ShowUsageTracker` (default OFF) so it's opt-in until the feature stabilises.
-
-- [ ] **Shortcut icon cache refresh after heal** — when `IShortcutHealer` recreates a missing .lnk (v1.10.2+ behaviour), Windows' icon cache may still show the previous broken state until the user triggers a refresh or the cache expires naturally. Observed 2026-04-20 on Lewis's machine after the initial heal. The fix is to invoke `ie4uinit.exe -show` after a successful heal (Microsoft-documented icon-cache refresh, lighter than killing explorer.exe). Alternatively the heavier `Stop-Process explorer; Remove-Item iconcache*.db; Start-Process explorer.exe` sequence works but flashes the taskbar. Should probably be a new `IIconCacheRefresher` service injected into `WindowsShortcutHealer` so the refresh only happens on the `HealedMissing` branch and never on `AlreadyPresent`. ~30 lines of code; plan for v1.10.3 or folded into v1.11.
 
 - [ ] **Show/hide button per slot** — a per-card button that toggles the associated Claude window between visible and hidden (close-to-tray) state. Motivation: right now the only way to hide a slot is to minimise-to-tray via Claude itself, and the only way to bring it back is to find it in the Windows system tray icon stack. CoODL already detects tray-resident slots (v1.8.2 surfaced them in the "Hidden / tray" section), so it knows which slots are hidden vs visible — a button that calls the right Win32 API to flip that state closes the loop. Implementation sketch: `ShowWindow(hwnd, SW_HIDE)` / `ShowWindow(hwnd, SW_SHOW) + SetForegroundWindow(hwnd)`. Button icon/label should reflect current state ("Hide" when visible, "Show" when tray-resident). Each slot row and each tray-resident row gets the button — one UI affordance that works in both directions. Risk: Claude's main-window Hwnd can change across minimise/restore cycles; the scanner might need to re-discover it. Test before shipping.
 
