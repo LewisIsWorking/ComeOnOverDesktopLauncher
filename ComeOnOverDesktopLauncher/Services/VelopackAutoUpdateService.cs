@@ -125,7 +125,8 @@ public class VelopackAutoUpdateService : IAutoUpdateService
         }
 
         _logger.LogInfo(
-            $"Applying update to {_pendingUpdate.TargetFullRelease.Version} and restarting");
+            $"Applying update: current {_updateManager.CurrentVersion} -> target " +
+            $"{_pendingUpdate.TargetFullRelease.Version}. Process will exit.");
         _updateManager.ApplyUpdatesAndRestart(_pendingUpdate);
     }
 }

@@ -2,6 +2,24 @@
 
 Current and upcoming work. Historical release notes for v1.0-v1.8.x live in [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md).
 
+## v1.10.1 - Released
+
+Validation hotfix for the v1.10.0 Velopack migration. Ships a one-line log-message enrichment purely so the auto-update pipeline can be exercised end-to-end: v1.10.0 users should receive this release automatically on their next poll tick (up to 6 hours) or next launcher restart.
+
+### The one-line change
+
+- [x] **`VelopackAutoUpdateService.ApplyUpdatesAndRestart` log line** now reports both source and target versions (`current X.Y.Z -> target A.B.C`) instead of just the target. Diagnostic improvement: when reading the log after an update fails or behaves oddly, you can now see at a glance which version the user was running when they clicked "Restart to install".
+
+### What this release validates
+
+- [x] **Second CI run with the fixed `--token` workflow produces a working release**. v1.10.0's initial CI attempt failed due to a token-passing bug; v1.10.1 confirms the fixed workflow is stable across runs.
+- [x] **Delta package generation kicks in from v1.10.1 onwards**. The published release should now contain a `ComeOnOverDesktopLauncher-1.10.1-delta.nupkg` alongside the full package, proving Velopack's `fetch-depth: 0` + git-history-based diff is working.
+- [x] **Install + update round-trip**. For users who installed v1.10.0's Setup.exe, their running v1.10.0 launcher will detect v1.10.1, silently download the delta, surface the green "Restart to install" banner, and successfully swap to v1.10.1 on restart. This is the first real-world proof that the Velopack infrastructure shipped in v1.10.0 actually delivers on its design promise.
+
+### No other changes
+
+Deliberately trivial. If anything else in the launcher behaviour or UI changes between v1.10.0 and v1.10.1, this release has failed at its job (which is to isolate the update-pipeline validation from any other variable).
+
 ## v1.10.0 - Released
 
 > ⚠️ **Migration notice.** v1.10.0 switches CoODL from a portable single-exe distribution to a Velopack-based installer with background auto-update. Existing users must download `ComeOnOverDesktopLauncher-win-Setup.exe` once from the [v1.10.0 release page](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/releases/tag/v1.10.0); from v1.10.1 onwards updates apply automatically. See [`docs/MIGRATION.md`](docs/MIGRATION.md) for step-by-step migration notes. Settings, slot nicknames, login sessions and Claude slot data all persist unchanged.
