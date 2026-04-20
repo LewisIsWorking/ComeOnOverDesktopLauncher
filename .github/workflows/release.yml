@@ -78,13 +78,13 @@ jobs:
       - name: Upload to GitHub Releases
         # `vpk upload github` creates the GitHub release AND uploads all
         # generated artefacts (Setup.exe, *.nupkg). Replaces the old
-        # softprops/action-gh-release step entirely. GITHUB_TOKEN is
-        # auto-injected by Actions so no new secrets are needed.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # softprops/action-gh-release step entirely. vpk doesn't read
+        # the GITHUB_TOKEN env var automatically - it requires --token
+        # explicitly.
         run: |
           vpk upload github `
             --repoUrl https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher `
+            --token ${{ secrets.GITHUB_TOKEN }} `
             --publish `
             --releaseName "ComeOnOver Desktop Launcher ${{ github.ref_name }}" `
             --tag ${{ github.ref_name }}
