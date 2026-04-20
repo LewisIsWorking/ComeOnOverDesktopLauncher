@@ -21,15 +21,23 @@
             Background="#1A1A1A">
         <StackPanel Spacing="8">
 
-            <!-- Thumbnail: 240x150 target, fit preserving aspect -->
+            <!-- Thumbnail: 240x150 target, fit preserving aspect.
+                 Click/tap opens the lightbox preview window. The hand
+                 cursor + tooltip make the interaction discoverable;
+                 the Tapped handler routes through the VM's
+                 ShowPreviewCommand so keyboard invocation would work
+                 the same way if we wire it later. -->
             <Border Height="150"
                     Background="#0D0D0D"
                     BorderBrush="#222"
                     BorderThickness="1"
                     CornerRadius="3"
-                    ToolTip.Tip="Live preview of this slot's Claude window. Refreshes on every poll tick. Toggle off via 'Show thumbnails' in the controls panel.">
+                    Cursor="Hand"
+                    PointerPressed="OnThumbnailPressed"
+                    ToolTip.Tip="Click to enlarge. Refreshes on every poll tick. Toggle off via 'Show thumbnails' in the controls panel.">
                 <Image Source="{Binding Thumbnail}"
-                       Stretch="Uniform"/>
+                       Stretch="Uniform"
+                       IsHitTestVisible="False"/>
             </Border>
 
             <!-- Slot + login pills row -->
@@ -43,17 +51,12 @@
                                Foreground="#DADADA"/>
                 </Border>
                 <Border CornerRadius="3" Padding="5,2"
+                        Background="{Binding LoginStatusBackground}"
                         ToolTip.Tip="{Binding LoginStatusTooltip}">
-                    <Border.Background>
-                        <SolidColorBrush Color="{Binding LoginStatusBackground}"/>
-                    </Border.Background>
                     <TextBlock Text="{Binding LoginStatusText}"
                                FontSize="9"
-                               FontWeight="SemiBold">
-                        <TextBlock.Foreground>
-                            <SolidColorBrush Color="{Binding LoginStatusForeground}"/>
-                        </TextBlock.Foreground>
-                    </TextBlock>
+                               FontWeight="SemiBold"
+                               Foreground="{Binding LoginStatusForeground}"/>
                 </Border>
             </StackPanel>
 

@@ -1,3 +1,4 @@
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -24,6 +25,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
 {
     private readonly Action<int, string>? _onNameChanged;
     private readonly Action<int>? _onKill;
+    private readonly Action<ClaudeInstanceViewModel>? _onShowPreview;
 
     [ObservableProperty] private int _instanceNumber;
     [ObservableProperty] private int _processId;
@@ -40,8 +42,29 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
     private bool _isSeeded;
 
     public string LoginStatusText => IsSeeded ? "Logged in" : "Not logged in";
-    public string LoginStatusBackground => IsSeeded ? "#2E7D32" : "#5D2F2F";
-    public string LoginStatusForeground => IsSeeded ? "#81C784" : "#EF9A9A";
+
+    /// <summary>
+    /// Pill background as an <see cref="IBrush"/> so XAML can bind
+    /// directly to a <c>Border.Background</c> without relying on the
+    /// legacy string-to-<c>Color</c> coercion that stopped working
+    /// cleanly inside compiled-binding UserControl data templates in
+    /// v1.9.1 (the pill was rendering transparent in the new card
+    /// layout). <see cref="SolidColorBrush"/> is frozen at
+    /// construction and safe to keep as a singleton per instance.
+    /// </summary>
+    public IBrush LoginStatusBackground => IsSeeded
+        ? new SolidColorBrush(Color.Parse("#2E7D32"))
+        : new SolidColorBrush(Color.Parse("#5D2F2F"));
+
+    /// <summary>
+    /// Pill foreground as an <see cref="IBrush"/>. Same rationale as
+    /// <see cref="LoginStatusBackground"/> - bind as
+    /// <c>TextBlock.Foreground</c> directly, no coercion needed.
+    /// </summary>
+    public IBrush LoginStatusForeground => IsSeeded
+        ? new SolidColorBrush(Color.Parse("#81C784"))
+        : new SolidColorBrush(Color.Parse("#EF9A9A"));
+
     public string LoginStatusTooltip => IsSeeded
         ? "Logged in"
         : "Not yet logged in - will log in on first launch";
@@ -51,13 +74,15 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         string initialName,
         bool isSeeded,
         Action<int, string>? onNameChanged = null,
-        Action<int>? onKill = null)
+        Action<int>? onKill = null,
+        Action<ClaudeInstanceViewModel>? onShowPreview = null)
     {
         _instanceNumber = instanceNumber;
         _slotName = initialName;
         _isSeeded = isSeeded;
         _onNameChanged = onNameChanged;
         _onKill = onKill;
+        _onShowPreview = onShowPreview;
     }
 
     partial void OnSlotNameChanged(string value)
@@ -69,6 +94,18 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
     private void Kill()
     {
         _onKill?.Invoke(ProcessId);
+    }
+
+    /// <summary>
+    /// Opens the lightbox-style preview window for this slot's
+    /// current <see cref="Thumbnail"/>. No-op if the callback isn't
+    /// wired or the thumbnail hasn't been captured yet; the preview
+    /// service also guards against a null bitmap at its own layer.
+    /// </summary>
+    [RelayCommand]
+    private void ShowPreview()
+    {
+        _onShowPreview?.Invoke(this);
     }
 
     public void UpdateFrom(InstanceResourceSnapshot snapshot)

@@ -38,6 +38,8 @@ public partial class ExternalInstanceListViewModel : ObservableObject
     [ObservableProperty] private double _totalRamMb;
     [ObservableProperty] private double _totalCpuPercent;
 
+    public Action<ExternalInstanceViewModel>? OnShowPreview { get; set; }
+
     public ExternalInstanceListViewModel(
         IClaudeProcessScanner scanner,
         IClaudeProcessClassifier classifier,
@@ -112,7 +114,10 @@ public partial class ExternalInstanceListViewModel : ObservableObject
             var row = Items.FirstOrDefault(vm => vm.Pid == info.ProcessId);
             if (row is null)
             {
-                row = new ExternalInstanceViewModel(info, CloseAsync);
+                row = new ExternalInstanceViewModel(
+                    info,
+                    CloseAsync,
+                    vm => OnShowPreview?.Invoke(vm));
                 Items.Add(row);
             }
 

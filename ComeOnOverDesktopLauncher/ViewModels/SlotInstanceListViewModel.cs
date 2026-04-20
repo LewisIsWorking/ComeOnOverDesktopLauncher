@@ -55,6 +55,7 @@ public partial class SlotInstanceListViewModel : ObservableObject
     public Func<int, string>? GetSlotName { get; set; }
     public Action<int, string>? OnSlotNameChanged { get; set; }
     public Action<int>? OnKillInstance { get; set; }
+    public Action<ClaudeInstanceViewModel>? OnShowPreview { get; set; }
 
     public SlotInstanceListViewModel(
         IClaudeProcessScanner scanner,
@@ -160,7 +161,8 @@ public partial class SlotInstanceListViewModel : ObservableObject
                 row = new ClaudeInstanceViewModel(
                     num, name, isSeeded,
                     (n, v) => OnSlotNameChanged?.Invoke(n, v),
-                    p => OnKillInstance?.Invoke(p));
+                    p => OnKillInstance?.Invoke(p),
+                    vm => OnShowPreview?.Invoke(vm));
                 target.Add(row);
             }
             row.UpdateFrom(snap);

@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using ComeOnOverDesktopLauncher.ViewModels;
 
 namespace ComeOnOverDesktopLauncher.Views.Controls;
 
@@ -16,11 +18,30 @@ namespace ComeOnOverDesktopLauncher.Views.Controls;
 /// "Quit" instead of "X" because there is no longer a visible window
 /// whose state needs protecting behind a confirm dialog.
 /// </para>
+///
+/// <para>
+/// Tap-to-enlarge works on tray cards too - the preview service
+/// falls back to the last captured frame when fresh capture fails
+/// (which it will for tray-resident windows since their main window
+/// handle is gone). Uses <c>PointerPressed</c> for the same reason
+/// as <see cref="SlotCard"/>.
+/// </para>
 /// </summary>
 public partial class TrayCard : UserControl
 {
     public TrayCard()
     {
         InitializeComponent();
+    }
+
+    private void OnThumbnailPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(null).Properties.PointerUpdateKind
+            != PointerUpdateKind.LeftButtonPressed) return;
+        if (DataContext is ClaudeInstanceViewModel vm &&
+            vm.ShowPreviewCommand.CanExecute(null))
+        {
+            vm.ShowPreviewCommand.Execute(null);
+        }
     }
 }

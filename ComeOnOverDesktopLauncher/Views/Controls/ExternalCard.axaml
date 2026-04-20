@@ -21,16 +21,19 @@
             Background="#151515">
         <StackPanel Spacing="8">
 
-            <!-- Thumbnail (muted) -->
+            <!-- Thumbnail (muted). Tap opens lightbox preview. -->
             <Border Height="150"
                     Background="#0A0A0A"
                     BorderBrush="#222"
                     BorderThickness="1"
                     CornerRadius="3"
-                    ToolTip.Tip="Live preview of this externally-launched Claude window. Refreshes on every poll tick.">
+                    Cursor="Hand"
+                    PointerPressed="OnThumbnailPressed"
+                    ToolTip.Tip="Click to enlarge. Live preview of this externally-launched Claude window.">
                 <Image Source="{Binding Thumbnail}"
                        Stretch="Uniform"
-                       Opacity="0.85"/>
+                       Opacity="0.85"
+                       IsHitTestVisible="False"/>
             </Border>
 
             <!-- External badge + PID -->

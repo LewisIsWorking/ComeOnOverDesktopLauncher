@@ -1,5 +1,6 @@
 using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
+using ComeOnOverDesktopLauncher.Services.Interfaces;
 
 namespace ComeOnOverDesktopLauncher.ViewModels;
 
@@ -26,6 +27,7 @@ public static class SlotCallbackBinder
         SlotInstanceListViewModel slots,
         AppSettings settings,
         IClaudeInstanceLauncher launcher,
+        IThumbnailPreviewService previewService,
         Action saveSettings,
         Action refreshResources)
     {
@@ -40,5 +42,23 @@ public static class SlotCallbackBinder
             launcher.KillInstance(processId);
             refreshResources();
         };
+        slots.OnShowPreview = vm =>
+            previewService.Show(vm.ProcessId, vm.Thumbnail, $"Slot {vm.InstanceNumber} - {vm.SlotName}");
+    }
+
+    /// <summary>
+    /// Wires the single preview callback on
+    /// <see cref="ExternalInstanceListViewModel"/>. Separate method
+    /// from <see cref="Bind"/> because the external list VM owns its
+    /// own service wiring (close confirm dialog, kill process) via its
+    /// constructor - only the preview callback needs to be injected
+    /// from the outside.
+    /// </summary>
+    public static void BindExternal(
+        ExternalInstanceListViewModel externals,
+        IThumbnailPreviewService previewService)
+    {
+        externals.OnShowPreview = vm =>
+            previewService.Show(vm.Pid, vm.Thumbnail, $"External PID {vm.Pid}");
     }
 }

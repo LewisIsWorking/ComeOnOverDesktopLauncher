@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using ComeOnOverDesktopLauncher.ViewModels;
 
 namespace ComeOnOverDesktopLauncher.Views.Controls;
 
@@ -15,11 +17,28 @@ namespace ComeOnOverDesktopLauncher.Views.Controls;
 /// full-text tooltip. Close button uses the existing confirm-dialog
 /// flow owned by the parent list VM.
 /// </para>
+///
+/// <para>
+/// Tap-to-enlarge uses the same <c>PointerPressed</c> pattern as
+/// <see cref="SlotCard"/>. The VM type differs but the command
+/// surface is identical.
+/// </para>
 /// </summary>
 public partial class ExternalCard : UserControl
 {
     public ExternalCard()
     {
         InitializeComponent();
+    }
+
+    private void OnThumbnailPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(null).Properties.PointerUpdateKind
+            != PointerUpdateKind.LeftButtonPressed) return;
+        if (DataContext is ExternalInstanceViewModel vm &&
+            vm.ShowPreviewCommand.CanExecute(null))
+        {
+            vm.ShowPreviewCommand.Execute(null);
+        }
     }
 }

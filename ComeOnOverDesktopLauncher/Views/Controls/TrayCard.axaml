@@ -25,17 +25,22 @@
             Opacity="0.85">
         <StackPanel Spacing="8">
 
-            <!-- Thumbnail with "Hidden" overlay -->
+            <!-- Thumbnail with "Hidden" overlay. Tap opens the
+                 lightbox preview - works on the last-known frame
+                 too, which is the whole point of keeping it around. -->
             <Grid>
                 <Border Height="150"
                         Background="#0D0D0D"
                         BorderBrush="#333"
                         BorderThickness="1"
                         CornerRadius="3"
-                        ToolTip.Tip="Last-known preview from before this slot was hidden. Not live - the window has been closed to tray. Reopen from the system tray to capture fresh.">
+                        Cursor="Hand"
+                        PointerPressed="OnThumbnailPressed"
+                        ToolTip.Tip="Click to enlarge the last-known preview. Not live - the window has been closed to tray. Reopen from the system tray to capture fresh.">
                     <Image Source="{Binding Thumbnail}"
                            Stretch="Uniform"
-                           Opacity="0.6"/>
+                           Opacity="0.6"
+                           IsHitTestVisible="False"/>
                 </Border>
                 <Border HorizontalAlignment="Right"
                         VerticalAlignment="Top"
@@ -44,7 +49,8 @@
                         BorderBrush="#555"
                         BorderThickness="1"
                         CornerRadius="3"
-                        Padding="5,2">
+                        Padding="5,2"
+                        IsHitTestVisible="False">
                     <TextBlock Text="Hidden"
                                FontSize="9"
                                FontWeight="SemiBold"

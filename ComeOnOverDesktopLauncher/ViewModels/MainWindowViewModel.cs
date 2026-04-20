@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
+using ComeOnOverDesktopLauncher.Services.Interfaces;
 
 namespace ComeOnOverDesktopLauncher.ViewModels;
 
@@ -14,15 +15,12 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 ///
 /// Delegates the slot list to <see cref="SlotInstanceListViewModel"/>
 /// and the external list to <see cref="ExternalInstanceListViewModel"/>
-/// so that each windowed Claude process appears in exactly one list
-/// (launcher-managed vs externally-launched).
+/// so each windowed Claude process appears in exactly one list.
 ///
-/// Launch sequencing (slot picking + seeding + process start) lives
-/// inside <see cref="IClaudeInstanceLauncher.LaunchInstances"/> so this
-/// VM stays focused on UI orchestration.
-///
-/// Every launch attempt is logged via <see cref="ILoggingService"/> to
-/// aid diagnosis of silent failures.
+/// Launch sequencing lives inside <see cref="IClaudeInstanceLauncher.LaunchInstances"/>
+/// so this VM stays focused on UI orchestration. Every launch attempt
+/// is logged via <see cref="ILoggingService"/> to aid diagnosis of
+/// silent failures.
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
@@ -34,6 +32,7 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly IUpdateNotifier _updateNotifier;
     private readonly IProcessService _processService;
     private readonly IWindowThumbnailService _thumbnailService;
+    private readonly IThumbnailPreviewService _previewService;
     private readonly ILoggingService _logger;
     private readonly DispatcherTimer _refreshTimer;
     private AppSettings _settings;
@@ -72,6 +71,7 @@ public partial class MainWindowViewModel : ObservableObject
         IClaudeVersionResolver claudeVersionResolver,
         IProcessService processService,
         IWindowThumbnailService thumbnailService,
+        IThumbnailPreviewService previewService,
         SlotInstanceListViewModel slotInstances,
         ExternalInstanceListViewModel externalInstances,
         ILoggingService logger)
@@ -84,6 +84,7 @@ public partial class MainWindowViewModel : ObservableObject
         _updateNotifier = updateNotifier;
         _processService = processService;
         _thumbnailService = thumbnailService;
+        _previewService = previewService;
         SlotInstances = slotInstances;
         ExternalInstances = externalInstances;
         _logger = logger;
@@ -98,7 +99,8 @@ public partial class MainWindowViewModel : ObservableObject
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
-        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, SaveSettings, RefreshResources);
+        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, _previewService, SaveSettings, RefreshResources);
+        SlotCallbackBinder.BindExternal(ExternalInstances, _previewService);
 
         _refreshTimer = new DispatcherTimer
             { Interval = TimeSpan.FromSeconds(_refreshIntervalSeconds) };
@@ -124,17 +126,14 @@ public partial class MainWindowViewModel : ObservableObject
         SaveSettings();
     }
 
-    // When the user toggles the "Show thumbnails" checkbox the
-    // ThumbnailRefresher handles settings persistence + clearing stale
-    // captures if the toggle went off. v1.9.1 extended this to include
-    // external instances now that they share IThumbnailableViewModel
-    // with slot instances.
+    // Delegates both settings persistence and (on disable) thumbnail
+    // clearing to ThumbnailRefresher. The overload that takes concrete
+    // collection types handles the Cast+Concat internally so this call
+    // site stays single-line.
     partial void OnThumbnailsEnabledChanged(bool value) =>
         ThumbnailRefresher.HandleToggleChange(
             value, _settings, SaveSettings,
-            SlotInstances.Items.Cast<IThumbnailableViewModel>()
-                .Concat(ExternalInstances.Items.Cast<IThumbnailableViewModel>()),
-            SlotInstances.TrayItems);
+            SlotInstances.Items, SlotInstances.TrayItems, ExternalInstances.Items);
 
     [RelayCommand]
     private void LaunchInstances()

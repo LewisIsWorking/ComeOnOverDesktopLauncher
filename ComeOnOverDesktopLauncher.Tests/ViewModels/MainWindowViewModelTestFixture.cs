@@ -3,7 +3,6 @@ using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.Services.Interfaces;
 using ComeOnOverDesktopLauncher.ViewModels;
 using NSubstitute;
-
 namespace ComeOnOverDesktopLauncher.Tests.ViewModels;
 
 /// <summary>
@@ -33,6 +32,7 @@ public class MainWindowViewModelTestFixture
     public IClaudeVersionResolver ClaudeVersionResolver { get; } = Substitute.For<IClaudeVersionResolver>();
     public IProcessService ProcessService { get; } = Substitute.For<IProcessService>();
     public IWindowThumbnailService ThumbnailService { get; } = Substitute.For<IWindowThumbnailService>();
+    public IThumbnailPreviewService PreviewService { get; } = Substitute.For<IThumbnailPreviewService>();
     public ILoggingService Logger { get; } = Substitute.For<ILoggingService>();
     public IClaudeProcessScanner Scanner { get; } = Substitute.For<IClaudeProcessScanner>();
     public IClaudeProcessClassifier Classifier { get; } = Substitute.For<IClaudeProcessClassifier>();
@@ -59,7 +59,7 @@ public class MainWindowViewModelTestFixture
             Launcher, CooService,
             SettingsService, PathResolver, ResourceMonitor,
             StartupService, UpdateNotifier, VersionProvider,
-            ClaudeVersionResolver, ProcessService, ThumbnailService,
+            ClaudeVersionResolver, ProcessService, ThumbnailService, PreviewService,
             slotInstances, externalInstances, Logger);
     }
 }

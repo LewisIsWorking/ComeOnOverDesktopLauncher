@@ -26,6 +26,7 @@ public partial class ExternalInstanceViewModel : ObservableObject, IThumbnailabl
     private const int CommandLineDisplayMaxLength = 80;
 
     private readonly Func<ExternalInstanceViewModel, Task>? _onClose;
+    private readonly Action<ExternalInstanceViewModel>? _onShowPreview;
 
     /// <summary>
     /// Operating-system process id. Stable for the lifetime of this row
@@ -72,13 +73,15 @@ public partial class ExternalInstanceViewModel : ObservableObject, IThumbnailabl
 
     public ExternalInstanceViewModel(
         ExternalProcessInfo info,
-        Func<ExternalInstanceViewModel, Task>? onClose = null)
+        Func<ExternalInstanceViewModel, Task>? onClose = null,
+        Action<ExternalInstanceViewModel>? onShowPreview = null)
     {
         Pid = info.ProcessId;
         CommandLine = info.CommandLine;
         CommandLineDisplay = BuildDisplay(info.CommandLine);
         StartTime = info.StartTime;
         _onClose = onClose;
+        _onShowPreview = onShowPreview;
     }
 
     /// <summary>
@@ -110,6 +113,17 @@ public partial class ExternalInstanceViewModel : ObservableObject, IThumbnailabl
     }
 
     private bool CanClose() => !IsClosing;
+
+    /// <summary>
+    /// Opens the lightbox-style preview window for this external
+    /// instance's current <see cref="Thumbnail"/>. Mirrors the
+    /// corresponding command on <see cref="ClaudeInstanceViewModel"/>.
+    /// </summary>
+    [RelayCommand]
+    private void ShowPreview()
+    {
+        _onShowPreview?.Invoke(this);
+    }
 
     /// <summary>
     /// Replaces <see cref="Thumbnail"/> with a new bitmap decoded from
