@@ -68,8 +68,14 @@
                      Padding="0,2"
                      PlaceholderText="Name this slot..."/>
 
-            <!-- Stats row: CPU, RAM, Uptime, Kill -->
-            <Grid ColumnDefinitions="*,*,*,Auto">
+            <!-- Stats row: CPU, RAM, Uptime, Hide, Kill.
+                 Hide (v1.10.5+) closes the window to the system tray
+                 WITHOUT killing the process - the slot will reappear
+                 in the "Hidden / tray" section on next scanner poll.
+                 Kill terminates the process entirely. Hide is styled
+                 neutral (grey) vs Kill (red) so users don't confuse
+                 the non-destructive action with the destructive one. -->
+            <Grid ColumnDefinitions="*,*,*,Auto,Auto">
                 <StackPanel Grid.Column="0" HorizontalAlignment="Center">
                     <TextBlock Text="CPU" FontSize="9" Foreground="Gray"
                                HorizontalAlignment="Center"/>
@@ -89,6 +95,15 @@
                                FontSize="11" HorizontalAlignment="Center"/>
                 </StackPanel>
                 <Button Grid.Column="3"
+                        Content="Hide"
+                        Command="{Binding HideCommand}"
+                        Foreground="#A0A0A0"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        FontSize="11"
+                        Padding="8,2"
+                        ToolTip.Tip="Hide this Claude window to the system tray without terminating it. The slot keeps running (MCP connections stay alive) and will reappear in the 'Hidden / tray' section. Reopen it via Claude's own tray icon."/>
+                <Button Grid.Column="4"
                         Content="X"
                         Command="{Binding KillCommand}"
                         Foreground="#EF9A9A"

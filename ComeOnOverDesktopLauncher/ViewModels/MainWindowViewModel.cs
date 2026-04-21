@@ -74,6 +74,7 @@ public partial class MainWindowViewModel : ObservableObject
         IProcessService processService,
         IWindowThumbnailService thumbnailService,
         IThumbnailPreviewService previewService,
+        IWindowHider windowHider,
         SlotInstanceListViewModel slotInstances,
         ExternalInstanceListViewModel externalInstances,
         ILoggingService logger)
@@ -100,7 +101,7 @@ public partial class MainWindowViewModel : ObservableObject
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
         _runningInstanceCount = _launcher.GetRunningInstanceCount();
 
-        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, _previewService, SaveSettings, RefreshResources);
+        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, windowHider, _previewService, SaveSettings, RefreshResources);
         SlotCallbackBinder.BindExternal(ExternalInstances, _previewService);
 
         Update = new MainWindowUpdateViewModel(

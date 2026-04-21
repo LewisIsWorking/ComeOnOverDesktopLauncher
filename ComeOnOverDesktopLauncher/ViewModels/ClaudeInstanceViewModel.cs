@@ -25,6 +25,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
 {
     private readonly Action<int, string>? _onNameChanged;
     private readonly Action<int>? _onKill;
+    private readonly Action<int>? _onHide;
     private readonly Action<ClaudeInstanceViewModel>? _onShowPreview;
 
     [ObservableProperty] private int _instanceNumber;
@@ -75,6 +76,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         bool isSeeded,
         Action<int, string>? onNameChanged = null,
         Action<int>? onKill = null,
+        Action<int>? onHide = null,
         Action<ClaudeInstanceViewModel>? onShowPreview = null)
     {
         _instanceNumber = instanceNumber;
@@ -82,6 +84,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         _isSeeded = isSeeded;
         _onNameChanged = onNameChanged;
         _onKill = onKill;
+        _onHide = onHide;
         _onShowPreview = onShowPreview;
     }
 
@@ -94,6 +97,20 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
     private void Kill()
     {
         _onKill?.Invoke(ProcessId);
+    }
+
+    /// <summary>
+    /// Hides this slot's Claude window to the system tray without
+    /// terminating it. v1.10.5+; routes through a callback supplied
+    /// by the list VM so per-row VMs stay service-free (matches the
+    /// Kill and ShowPreview patterns). On the next scanner poll the
+    /// slot will move from the SlotCard list into the TrayCard list
+    /// automatically - no coordination needed here.
+    /// </summary>
+    [RelayCommand]
+    private void Hide()
+    {
+        _onHide?.Invoke(ProcessId);
     }
 
     /// <summary>

@@ -7,8 +7,8 @@
         <ApplicationManifest>app.manifest</ApplicationManifest>
         <ApplicationIcon>Assets\appicon.ico</ApplicationIcon>
         <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
-        <Version>1.10.4</Version>
-        <AssemblyVersion>1.10.4</AssemblyVersion>
+        <Version>1.10.5</Version>
+        <AssemblyVersion>1.10.5</AssemblyVersion>
     </PropertyGroup>
 
     <ItemGroup>

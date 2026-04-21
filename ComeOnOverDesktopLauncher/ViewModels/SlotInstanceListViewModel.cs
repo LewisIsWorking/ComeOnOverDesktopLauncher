@@ -55,6 +55,7 @@ public partial class SlotInstanceListViewModel : ObservableObject
     public Func<int, string>? GetSlotName { get; set; }
     public Action<int, string>? OnSlotNameChanged { get; set; }
     public Action<int>? OnKillInstance { get; set; }
+    public Action<int>? OnHideInstance { get; set; }
     public Action<ClaudeInstanceViewModel>? OnShowPreview { get; set; }
 
     public SlotInstanceListViewModel(
@@ -162,6 +163,7 @@ public partial class SlotInstanceListViewModel : ObservableObject
                     num, name, isSeeded,
                     (n, v) => OnSlotNameChanged?.Invoke(n, v),
                     p => OnKillInstance?.Invoke(p),
+                    p => OnHideInstance?.Invoke(p),
                     vm => OnShowPreview?.Invoke(vm));
                 target.Add(row);
             }

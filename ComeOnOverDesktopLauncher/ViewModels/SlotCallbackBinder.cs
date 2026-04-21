@@ -27,6 +27,7 @@ public static class SlotCallbackBinder
         SlotInstanceListViewModel slots,
         AppSettings settings,
         IClaudeInstanceLauncher launcher,
+        IWindowHider windowHider,
         IThumbnailPreviewService previewService,
         Action saveSettings,
         Action refreshResources)
@@ -42,6 +43,11 @@ public static class SlotCallbackBinder
             launcher.KillInstance(processId);
             refreshResources();
         };
+        // v1.10.5: Hide action just forwards to the window hider.
+        // No refreshResources() here - the hidden slot stays alive,
+        // the next scanner poll (on its own schedule) will move it
+        // into the TrayCard list without us prodding anything.
+        slots.OnHideInstance = processId => windowHider.TryHide(processId);
         slots.OnShowPreview = vm =>
             previewService.Show(vm.ProcessId, vm.Thumbnail, $"Slot {vm.InstanceNumber} - {vm.SlotName}");
     }
