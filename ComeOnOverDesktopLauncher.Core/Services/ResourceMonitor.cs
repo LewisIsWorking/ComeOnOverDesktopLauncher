@@ -8,6 +8,16 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// between the current poll and the previous one — call GetSnapshots()
 /// on a regular interval (e.g. every 5s) for meaningful CPU readings.
 /// First call always returns 0% CPU (no previous baseline to compare).
+///
+/// <para>
+/// v1.10.7: switched from <c>GetWindowedProcessSnapshots</c> to
+/// <c>GetAllProcessSnapshots</c> so that Total RAM and CPU include the
+/// full process tree (browser-main + renderer + GPU + crashpad + network
+/// service + node-service, etc.) matching what Windows Task Manager
+/// reports. Per-slot card numbers still show the browser-main process
+/// only (requires tree aggregation — tracked in the backlog); the
+/// improvement here is visible in the resource totals row.
+/// </para>
 /// </summary>
 public class ResourceMonitor : IResourceMonitor
 {
@@ -24,7 +34,11 @@ public class ResourceMonitor : IResourceMonitor
 
     public IReadOnlyList<InstanceResourceSnapshot> GetSnapshots()
     {
-        var current = _processService.GetWindowedProcessSnapshots("claude");
+        // Get ALL claude processes (main + children) so totals match
+        // Task Manager. Per-slot reconciliation downstream filters to
+        // main PIDs via the scanner; child-process snapshots are silently
+        // dropped there, but contribute correctly to the totals here.
+        var current = _processService.GetAllProcessSnapshots("claude");
         var results = current
             .Select((snapshot, index) => BuildSnapshot(snapshot, index + 1))
             .ToList();

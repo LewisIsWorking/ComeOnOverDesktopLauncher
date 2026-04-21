@@ -14,10 +14,14 @@ public class ResourceMonitorTests
         new(pid, ramBytes, TimeSpan.FromMilliseconds(cpuMs),
             DateTime.UtcNow.AddSeconds(-secondsAgo), DateTime.UtcNow);
 
+    // v1.10.7: ResourceMonitor uses GetAllProcessSnapshots so totals match
+    // Task Manager (full process tree, not just windowed main process).
+    // Tests updated to mock the new method accordingly.
+
     [Fact]
     public void GetSnapshots_WhenNoProcesses_ReturnsEmpty()
     {
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(new List<ProcessSnapshot>());
 
         var result = CreateSut().GetSnapshots();
@@ -28,7 +32,7 @@ public class ResourceMonitorTests
     [Fact]
     public void GetSnapshots_AssignsInstanceNumbersSequentially()
     {
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(new List<ProcessSnapshot>
             {
                 MakeSnapshot(1, 100_000_000, 0),
@@ -44,7 +48,7 @@ public class ResourceMonitorTests
     [Fact]
     public void GetSnapshots_FirstCall_ReturnsCpuZero()
     {
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(new List<ProcessSnapshot> { MakeSnapshot(1, 100_000_000, 500) });
 
         var result = CreateSut().GetSnapshots();
@@ -55,7 +59,7 @@ public class ResourceMonitorTests
     [Fact]
     public void GetSnapshots_CalculatesRamCorrectly()
     {
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(new List<ProcessSnapshot> { MakeSnapshot(1, 200 * 1024 * 1024, 0) });
 
         var result = CreateSut().GetSnapshots();
@@ -66,7 +70,7 @@ public class ResourceMonitorTests
     [Fact]
     public void GetSnapshots_UpdatesTotalRamMb()
     {
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(new List<ProcessSnapshot>
             {
                 MakeSnapshot(1, 100 * 1024 * 1024, 0),
@@ -82,7 +86,7 @@ public class ResourceMonitorTests
     [Fact]
     public void GetSnapshots_UptimeReflectsStartTime()
     {
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(new List<ProcessSnapshot> { MakeSnapshot(1, 0, 0, secondsAgo: 120) });
 
         var result = CreateSut().GetSnapshots();
@@ -96,7 +100,7 @@ public class ResourceMonitorTests
         var withProcess = new List<ProcessSnapshot> { MakeSnapshot(1, 0, 0) };
         var withoutProcess = new List<ProcessSnapshot>();
 
-        _processService.GetWindowedProcessSnapshots("claude")
+        _processService.GetAllProcessSnapshots("claude")
             .Returns(withProcess, withoutProcess);
 
         var sut = CreateSut();

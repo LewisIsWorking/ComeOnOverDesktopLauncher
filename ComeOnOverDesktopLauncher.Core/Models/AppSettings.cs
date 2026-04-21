@@ -26,18 +26,20 @@ public class AppSettings
     /// and silently downloads any available update in the background.
     /// On-by-default because auto-update is the whole point of the
     /// v1.10.0 Velopack switch; the user's only opt-out is this
-    /// checkbox (exposed in <c>LaunchControlsPanel</c>). Persisted
-    /// because users who disable it expect that choice to stick across
-    /// restarts - losing the preference is worse than having it.
-    ///
-    /// <para>
-    /// Note: this setting only controls the check-and-download phase.
-    /// Applying the update (the actual restart) is always user-driven
-    /// via the "Restart to install" button in the update banner, per
-    /// the v1.10.0 UX spec (decision 4, option b).
-    /// </para>
+    /// checkbox. Persisted because users who disable it expect that
+    /// choice to stick across restarts.
     /// </summary>
     public bool AutoCheckForUpdates { get; set; } = true;
+
+    /// <summary>
+    /// When true, the Claude usage dashboard WebView is docked to the
+    /// left of the launcher content instead of the right. Default is
+    /// false (right). Persisted so the user's preference survives
+    /// restarts. Toggled via the "Usage on left" checkbox in the
+    /// settings row or via the GridSplitter right-click context menu.
+    /// Added in v1.10.7.
+    /// </summary>
+    public bool UsagePanelOnLeft { get; set; } = false;
 
     /// <summary>
     /// User-defined names for each slot. Key = slot number, value = display name.

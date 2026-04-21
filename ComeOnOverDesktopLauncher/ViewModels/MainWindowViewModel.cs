@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ComeOnOverDesktopLauncher.Core.Models;
@@ -21,13 +21,6 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 ///   <item><see cref="Update"/> - Velopack update banner state</item>
 ///   <item><see cref="Resources"/> - running count, total RAM/CPU, refresh timer, thumbnail capture</item>
 /// </list>
-/// XAML bindings that used to target root properties like
-/// <c>TotalRamMb</c>, <c>RunningInstanceCount</c>, or
-/// <c>HasRunningInstances</c> now go through
-/// <c>Resources.TotalRamMb</c> etc. The v1.10.6 extraction was
-/// forced by the root hitting 200 lines after v1.10.5's Hide
-/// feature; per the ROADMAP handoff rule, the refactor ran ahead
-/// of any new feature work so future changes inherit the headroom.
 /// </para>
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
@@ -45,6 +38,25 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty] private bool _isClaudeInstalled;
     [ObservableProperty] private bool _launchOnStartup;
     [ObservableProperty] private bool _thumbnailsEnabled;
+
+    /// <summary>
+    /// When true, the usage WebView is docked to the left of the
+    /// launcher content. Persisted in <see cref="AppSettings"/>.
+    /// Toggled via the settings-row checkbox (A) or the GridSplitter
+    /// right-click context menu (B). Added in v1.10.7.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsagePanelPositionMenuText))]
+    private bool _usagePanelOnLeft;
+
+    /// <summary>
+    /// Label for the GridSplitter context-menu item. Reads "Move usage
+    /// panel to left" when the panel is currently on the right, and
+    /// vice versa, so the item always describes what clicking it will do.
+    /// </summary>
+    public string UsagePanelPositionMenuText => UsagePanelOnLeft
+        ? "Move usage panel to right"
+        : "Move usage panel to left";
 
     public string AppVersion { get; }
     public string? ClaudeVersion { get; }
@@ -89,6 +101,7 @@ public partial class MainWindowViewModel : ObservableObject
         _settings = _settingsService.Load();
         _slotCount = _settings.DefaultSlotCount;
         _thumbnailsEnabled = _settings.ThumbnailsEnabled;
+        _usagePanelOnLeft = _settings.UsagePanelOnLeft;
         _launchOnStartup = _startupService.IsStartupEnabled();
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
 
@@ -121,14 +134,19 @@ public partial class MainWindowViewModel : ObservableObject
             _startupService.DisableStartup();
     }
 
-    // Delegates both settings persistence and (on disable) thumbnail
-    // clearing to ThumbnailRefresher. The overload that takes concrete
-    // collection types handles the Cast+Concat internally so this call
-    // site stays single-line.
     partial void OnThumbnailsEnabledChanged(bool value) =>
         ThumbnailRefresher.HandleToggleChange(
             value, _settings, SaveSettings,
             SlotInstances.Items, SlotInstances.TrayItems, ExternalInstances.Items);
+
+    partial void OnUsagePanelOnLeftChanged(bool value)
+    {
+        _settings.UsagePanelOnLeft = value;
+        SaveSettings();
+    }
+
+    [RelayCommand]
+    private void ToggleUsagePanelPosition() => UsagePanelOnLeft = !UsagePanelOnLeft;
 
     [RelayCommand]
     private void LaunchInstances()

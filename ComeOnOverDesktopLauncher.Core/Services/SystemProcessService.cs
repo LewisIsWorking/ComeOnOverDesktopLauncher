@@ -97,6 +97,42 @@ public class SystemProcessService : IProcessService
             .ToList();
     }
 
+    /// <summary>
+    /// Returns snapshots for ALL processes with the given name including
+    /// child/helper processes that have no visible window (renderer, GPU,
+    /// crashpad, network service, etc.). Used by <see cref="ResourceMonitor"/>
+    /// so Total RAM and CPU match what Windows Task Manager shows for the
+    /// full process tree rather than just the browser-main process per slot.
+    /// Guards against races where a child exits between enumeration and
+    /// property access. Added in v1.10.7.
+    /// </summary>
+    public IReadOnlyList<ProcessSnapshot> GetAllProcessSnapshots(string processName)
+    {
+        var now = DateTime.UtcNow;
+        var results = new List<ProcessSnapshot>();
+        foreach (var p in Process.GetProcessesByName(processName))
+        {
+            try
+            {
+                results.Add(new ProcessSnapshot(
+                    p.Id,
+                    p.WorkingSet64,
+                    p.TotalProcessorTime,
+                    p.StartTime.ToUniversalTime(),
+                    now));
+            }
+            catch (Exception)
+            {
+                // Process exited between enumeration and property read — skip it.
+            }
+            finally
+            {
+                p.Dispose();
+            }
+        }
+        return results;
+    }
+
     public void KillProcess(int processId)
     {
         try

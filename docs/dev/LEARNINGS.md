@@ -55,6 +55,13 @@ These come from a session where I called a reproducible bug "transient", mistook
 
 - **"Continue" isn't always the right response to a stuck investigation.** When a fix attempt fails, stop and write a plan BEFORE another attempt. I burned several turns trying slightly-different fixes when I should have stopped after the second failure to write the proper diagnostic + design doc. The user had to explicitly tell me to stop. Signs to stop: repeated failures with the same symptom; speculating about causes rather than measuring; running out of tokens while still flailing. Better to ship a honest roadmap entry + one well-designed follow-up than three half-implementations.
 
+## Avalonia.Controls.WebView - type name resolution
+Added in v1.10.7. Key facts for future sessions:
+- Package: Avalonia.Controls.WebView 12.0.0. The NuGet name is NOT Avalonia.WebView or WebView.Avalonia (both wrong - the former doesn't exist, the latter is a dead third-party package).
+- NativeWebView is in the Avalonia.Controls namespace - no extra using needed.
+- WebViewNavigationCompletedEventArgs is also in Avalonia.Controls - discovered from build error AVLN3000.
+- WindowsWebView2EnvironmentRequestedEventArgs exists in the DLL but its namespace was not findable in the v1.10.7 session. Workaround: set UserDataFolder via reflection (args.GetType().GetProperty("UserDataFolder")?.SetValue(args, path)) inside EnvironmentRequested handler. Try-catch makes it a silent no-op on failure.
+- No AppBuilder extension (UseDesktopWebView etc.) needed for Avalonia.Controls.WebView 12.0.0 - just add the package and use NativeWebView in XAML.
 ## Memory / mental model
 
 - The user runs the CoODL launcher on Windows (Dell laptop is Linux but not the target).

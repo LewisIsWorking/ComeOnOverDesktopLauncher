@@ -6,6 +6,25 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.7 - Released
+Embeds the Claude usage dashboard directly into the main launcher window as a side-by-side panel, adds a responsive breakpoint that stacks vertically on narrow windows, and fixes the resource total underestimation.
+### Embedded usage dashboard (NativeWebView)
+- Avalonia.Controls.WebView 12.0.0 added as a dependency. Uses platform-native rendering (WebView2 on Windows, WKWebView on macOS, WebKitGTK on Linux) - no Chromium bundled, negligible install size delta.
+- NativeWebView embedded directly in MainWindow.axaml as the right column of a two-panel Grid. Navigates to claude.ai/settings/usage on launch.
+- NavigationCompleted redirect: after login claude.ai redirects to the home page; detected and re-navigated to /settings/usage automatically.
+- Auth persistence: EnvironmentRequested handler sets UserDataFolder via reflection (avoids needing the exact WindowsWebView2EnvironmentRequestedEventArgs type name at compile time, keeping the code cross-platform). User logs in once; cookies survive restarts.
+### Responsive layout
+- MainWindow.axaml.cs ApplyLayout() runs on OnSizeChanged and OnOpened. Width >= 900px: horizontal Grid (440,4,*) with vertical GridSplitter. Width < 900px: vertical Grid (*,4,320) with horizontal GridSplitter.
+- Layout re-applies when UsagePanelOnLeft changes, keeping the orientation consistent.
+### Usage panel position toggle
+- **Checkbox (A)**: "Usage on left" checkbox added to the settings row in LaunchControlsPanel.axaml, binding to MainWindowViewModel.UsagePanelOnLeft. Persisted in AppSettings.
+- **Right-click (B)**: GridSplitter context menu wired in MainWindow.axaml.cs. Opens on right-click; header reads "Move usage panel to left/right" depending on current state. Click triggers ToggleUsagePanelPositionCommand.
+### RAM/CPU total fix
+- IProcessService.GetAllProcessSnapshots added. Unlike GetWindowedProcessSnapshots, it captures all claude.exe processes including child/helper processes (renderer, GPU, crashpad, network service, node-service, etc.) that Electron spawns per instance.
+- ResourceMonitor switched from GetWindowedProcessSnapshots to GetAllProcessSnapshots so TotalRamMb and TotalCpuPercent match what Windows Task Manager shows for the full process tree. Per-slot card numbers still show the browser-main process only (full-tree aggregation is a backlog item).
+### Numbers
+- 263 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 1 new package (Avalonia.Controls.WebView 12.0.0). 8 files modified + 1 test file updated.
 ## v1.10.6 - Released
 Completes the show/hide-button pair introduced in v1.10.5. Adds a Show button to every TrayCard row so hidden Claude slots can be restored to the foreground directly from the launcher without digging through Claude system-tray menu. Also fixes a latent bug where tray-resident slots were invisible to the resource monitor and were dropped from both collections on the next poll.
 ### New IWindowShower service
@@ -99,6 +118,9 @@ Users currently stuck on v1.10.2/v1.10.3 because their apply keeps failing won't
 
 ## Backlog / Under Consideration
 
+- [ ] **Per-slot full-tree RAM/CPU aggregation** - the v1.10.7 resource fix corrects the totals row but per-slot cards still show only the browser-main process stats. Fix requires grouping all claude.exe child processes by their root parent PID (WMI already has parent-child data via ClaudeProcessMainIdentifier) and summing into the main process snapshot in ResourceMonitor. Medium complexity; blocked on plumbing the scanner output into the resource monitor.
+- [ ] **Scroll position preservation** - the left launcher panel loses its scroll position when the window is resized (the responsive breakpoint triggers a grid layout rebuild which resets scroll). Fixable by saving ScrollViewer.Offset before and restoring after ApplyLayout().
+- [ ] **Per-instance token/usage display** - surface tokens or session usage % per slot next to CPU/RAM/Up in the slot cards. Three possible data sources: (a) scrape from the embedded usage WebView (fragile, Anthropic can change the DOM), (b) if Anthropic exposes a stable per-session API endpoint, call it per slot, (c) local heuristic from CPU/network activity (rough proxy). No stable API currently known; defer until one appears or the WebView scraping approach is validated.
 - [ ] **Show-from-tray button** (other half of the v1.10.5 Hide feature) - enumerate hidden top-level windows by PID, `ShowWindow(SW_SHOW) + SetForegroundWindow`. Appears on TrayCard rows so hidden slots can be restored without digging through Claude's system-tray menu. Risk: Claude's main-window `Hwnd` can change across hide/show cycles, the scanner may need to re-discover it. Test before shipping.
 
 - [ ] **Investigate Velopack retry-count configuration** - the 10x1s backup-retry window that caused the v1.10.2 -> v1.10.3 failures is hardcoded in Velopack 0.0.1298. Check if `vpk pack` exposes a flag to raise it, or whether newer Velopack versions default to a longer window. Even 30x2s would cover most Defender scan durations. Low-priority because the v1.10.4 banner now gives users a clean escape hatch.

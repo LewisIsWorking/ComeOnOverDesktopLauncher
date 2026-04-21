@@ -6,8 +6,8 @@
         x:DataType="vm:MainWindowViewModel"
         Title="ComeOnOver Desktop Launcher"
         Icon="avares://ComeOnOverDesktopLauncher/Assets/appicon-256.png"
-        Width="440" Height="520"
-        MinWidth="360" MinHeight="400"
+        Width="1100" Height="700"
+        MinWidth="600" MinHeight="400"
         WindowStartupLocation="CenterScreen"
         WindowState="Maximized">
 
@@ -15,37 +15,59 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <ScrollViewer>
-        <StackPanel Margin="24" Spacing="14">
+    <!-- Two-panel layout: launcher content + Claude usage dashboard.
+         Column/row definitions and Grid.Column/Row assignments are set
+         entirely in code-behind (MainWindow.axaml.cs) so the responsive
+         breakpoint (< 900px = vertical stack) and the UsagePanelOnLeft
+         toggle can both be applied without converters.
+         Added in v1.10.7. -->
+    <Grid x:Name="MainGrid">
 
-            <TextBlock Text="ComeOnOver Desktop Launcher"
-                       FontSize="16" FontWeight="SemiBold"
-                       HorizontalAlignment="Center"/>
+        <!-- Left/top panel: existing launcher content -->
+        <ScrollViewer x:Name="LauncherPanel">
+            <StackPanel Margin="24" Spacing="14">
 
-            <controls:LaunchControlsPanel/>
+                <TextBlock Text="ComeOnOver Desktop Launcher"
+                           FontSize="16" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"/>
 
-            <Button Content="Open ComeOnOver"
-                    Command="{Binding LaunchComeOnOverCommand}"
-                    HorizontalAlignment="Stretch"
-                    HorizontalContentAlignment="Center"/>
+                <controls:LaunchControlsPanel/>
 
-            <controls:ResourceTotalsRow x:Name="TotalsRow"/>
+                <Button Content="Open ComeOnOver"
+                        Command="{Binding LaunchComeOnOverCommand}"
+                        HorizontalAlignment="Stretch"
+                        HorizontalContentAlignment="Center"/>
 
-            <controls:SlotInstanceList/>
+                <controls:ResourceTotalsRow x:Name="TotalsRow"/>
 
-            <controls:TrayInstanceList/>
+                <controls:SlotInstanceList/>
 
-            <controls:ExternalInstanceList/>
+                <controls:TrayInstanceList/>
 
-            <TextBlock Text="{Binding FooterVersionText}"
-                       Foreground="Gray" FontSize="10"
-                       Opacity="0.5"
-                       HorizontalAlignment="Center"/>
+                <controls:ExternalInstanceList/>
 
-            <TextBlock Text="{Binding StatusMessage}"
-                       Foreground="Gray" FontSize="11"
-                       HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding FooterVersionText}"
+                           Foreground="Gray" FontSize="10"
+                           Opacity="0.5"
+                           HorizontalAlignment="Center"/>
 
-        </StackPanel>
-    </ScrollViewer>
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="Gray" FontSize="11"
+                           HorizontalAlignment="Center"/>
+
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Divider: drag to resize. Right-click for position toggle.
+             ResizeDirection is set in code-behind to match the current
+             layout (Columns when horizontal, Rows when vertical). -->
+        <GridSplitter x:Name="PanelSplitter"
+                      Background="#2A2A2A"/>
+
+        <!-- Right/bottom panel: Claude usage dashboard. -->
+        <NativeWebView x:Name="UsageWebView"
+                       Source="https://claude.ai/settings/usage"
+                       NavigationCompleted="OnUsageNavigationCompleted"/>
+
+    </Grid>
 </Window>

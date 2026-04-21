@@ -13,25 +13,8 @@ public interface IProcessService
     /// Starts a process with its stderr stream redirected to
     /// <paramref name="onStderrLine"/>, invoked once per line as the child
     /// process writes. Used specifically for Claude Desktop launches so
-    /// upstream Electron/Node warnings (DEP0040 punycode, DEP0169
-    /// url.parse, BuddyBleTransport handler errors,
-    /// MaxListenersExceededWarning, etc.) are captured into CoODL's
-    /// diagnostic log with a clear attribution tag rather than being
-    /// lost (production - no console attached) or cluttering the dev
-    /// terminal.
-    ///
-    /// The callback is invoked from a background task, so
-    /// implementations must expect concurrent invocations if multiple
-    /// processes are launched via this method. The reader task exits
-    /// when the child process's stderr stream closes (typically at
-    /// process exit); implementations must not leak threads across
-    /// many launches.
-    ///
-    /// <b>Not for generic use.</b> Prefer <see cref="Start"/> for
-    /// non-Claude launches (ComeOnOver web app, etc.) where we don't
-    /// need stderr capture and want to keep stdio inheritance for
-    /// easy debugging from a terminal.
-    ///
+    /// upstream Electron/Node warnings are captured into CoODL's
+    /// diagnostic log rather than being lost or cluttering the terminal.
     /// Returns the child process ID for log correlation, or 0 if the
     /// process failed to start.
     /// </summary>
@@ -39,6 +22,7 @@ public interface IProcessService
         string fileName,
         string? arguments,
         Action<string> onStderrLine);
+
     int CountByName(string processName);
 
     /// <summary>
@@ -49,10 +33,20 @@ public interface IProcessService
 
     /// <summary>
     /// Returns raw snapshots for all windowed processes with the given name.
-    /// Used by ResourceMonitor to compute CPU and RAM usage.
+    /// Excludes child processes (renderer, GPU, crashpad, etc.) that have no
+    /// visible window. Used where only the browser-main process matters.
     /// </summary>
     IReadOnlyList<ProcessSnapshot> GetWindowedProcessSnapshots(string processName);
 
+    /// <summary>
+    /// Returns raw snapshots for ALL processes with the given name,
+    /// including child/helper processes that have no visible window.
+    /// Used by <see cref="ResourceMonitor"/> so that Total RAM and CPU
+    /// match what Windows Task Manager reports for the full process tree
+    /// rather than just the browser-main process per slot.
+    /// Added in v1.10.7 to fix the underestimation of resource totals.
+    /// </summary>
+    IReadOnlyList<ProcessSnapshot> GetAllProcessSnapshots(string processName);
 
     /// <summary>
     /// Terminates the process with the given ID, including all its child processes.

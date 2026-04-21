@@ -1,3 +1,6 @@
+using System;
+using System.ComponentModel;
+using System.IO;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -9,30 +12,54 @@ namespace ComeOnOverDesktopLauncher.Views;
 
 public partial class MainWindow : Window
 {
-    /// <summary>
-    /// Injected by App.axaml.cs immediately after construction so the
-    /// Copy Screenshot button can capture this window without the VM
-    /// needing an Avalonia Window reference.
-    /// </summary>
+    private const double BreakpointWidth = 900;
+
+    // Persistent WebView2 profile folder — user logs in to claude.ai once
+    // and auth cookies survive restarts. Set via reflection on
+    // WindowsWebView2EnvironmentRequestedEventArgs.UserDataFolder so the
+    // code compiles cross-platform without #if guards.
+    private static readonly string WebViewProfileFolder = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "ComeOnOverDesktopLauncher", "webview-profile");
+
     public IWindowSnapshotService? SnapshotService { get; set; }
 
     public MainWindow()
     {
         InitializeComponent();
 
-        // The Copy screenshot button lives inside the ResourceTotalsRow
-        // UserControl. The UserControl doesn't own the Window reference
-        // needed to capture it, so it raises a CopyClicked event we
-        // subscribe to here. Split out from the inline Click=... handler
-        // in v1.8.2 when MainWindow.axaml was decomposed into UserControls.
         var totalsRow = this.FindControl<ResourceTotalsRow>("TotalsRow");
         if (totalsRow is not null)
             totalsRow.CopyClicked += OnCopyScreenshotClick;
+
+        WireContextMenu();
+        UsageWebView.EnvironmentRequested += OnUsageEnvironmentRequested;
+    }
+
+    protected override void OnDataContextChanged(EventArgs e)
+    {
+        base.OnDataContextChanged(e);
+        if (DataContext is MainWindowViewModel vm)
+        {
+            vm.PropertyChanged += OnVmPropertyChanged;
+            ApplyLayout(Bounds.Width);
+        }
+    }
+
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
+        ApplyLayout(Bounds.Width);
+    }
+
+    protected override void OnSizeChanged(SizeChangedEventArgs e)
+    {
+        base.OnSizeChanged(e);
+        ApplyLayout(e.NewSize.Width);
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)
     {
-        // Hide to tray instead of closing - use the tray icon Quit to fully exit
         e.Cancel = true;
         Hide();
         base.OnClosing(e);
@@ -41,16 +68,115 @@ public partial class MainWindow : Window
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-
-        // Clear TextBox focus when clicking outside any TextBox
         if (e.Source is not TextBox)
             Focus();
     }
 
+    // -------------------------------------------------------------------
+    // Layout engine
+    // -------------------------------------------------------------------
+
+    private void ApplyLayout(double width)
+    {
+        var usageOnLeft = (DataContext as MainWindowViewModel)?.UsagePanelOnLeft ?? false;
+        if (width < BreakpointWidth)
+            ApplyVerticalLayout();
+        else
+            ApplyHorizontalLayout(usageOnLeft);
+    }
+
+    private void ApplyHorizontalLayout(bool usageOnLeft)
+    {
+        MainGrid.ColumnDefinitions = new ColumnDefinitions("440,4,*");
+        MainGrid.RowDefinitions = new RowDefinitions("*");
+
+        var launcherCol = usageOnLeft ? 2 : 0;
+        var usageCol    = usageOnLeft ? 0 : 2;
+
+        Grid.SetRow(LauncherPanel, 0);  Grid.SetColumn(LauncherPanel, launcherCol);
+        Grid.SetRow(PanelSplitter, 0);  Grid.SetColumn(PanelSplitter, 1);
+        Grid.SetRow(UsageWebView, 0);   Grid.SetColumn(UsageWebView, usageCol);
+
+        PanelSplitter.ResizeDirection = GridResizeDirection.Columns;
+    }
+
+    private void ApplyVerticalLayout()
+    {
+        MainGrid.ColumnDefinitions = new ColumnDefinitions("*");
+        MainGrid.RowDefinitions = new RowDefinitions("*,4,320");
+
+        Grid.SetRow(LauncherPanel, 0);  Grid.SetColumn(LauncherPanel, 0);
+        Grid.SetRow(PanelSplitter, 1);  Grid.SetColumn(PanelSplitter, 0);
+        Grid.SetRow(UsageWebView, 2);   Grid.SetColumn(UsageWebView, 0);
+
+        PanelSplitter.ResizeDirection = GridResizeDirection.Rows;
+    }
+
+    private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.UsagePanelOnLeft))
+            ApplyLayout(Bounds.Width);
+    }
+
+    // -------------------------------------------------------------------
+    // GridSplitter context menu (option B)
+    // -------------------------------------------------------------------
+
+    private MenuItem? _toggleMenuItem;
+
+    private void WireContextMenu()
+    {
+        _toggleMenuItem = new MenuItem { Header = "" };
+        _toggleMenuItem.Click += (_, _) =>
+        {
+            if (DataContext is MainWindowViewModel vm)
+                vm.ToggleUsagePanelPositionCommand.Execute(null);
+        };
+
+        var menu = new ContextMenu();
+        menu.Items.Add(_toggleMenuItem);
+        menu.Opening += (_, _) =>
+        {
+            if (DataContext is MainWindowViewModel vm && _toggleMenuItem is not null)
+                _toggleMenuItem.Header = vm.UsagePanelPositionMenuText;
+        };
+
+        PanelSplitter.ContextMenu = menu;
+    }
+
+    // -------------------------------------------------------------------
+    // WebView: auth persistence + redirect fix
+    // -------------------------------------------------------------------
+
+    private static void OnUsageEnvironmentRequested(
+        object? sender,
+        WebViewEnvironmentRequestedEventArgs args)
+    {
+        try
+        {
+            args.GetType().GetProperty("UserDataFolder")
+                ?.SetValue(args, WebViewProfileFolder);
+        }
+        catch
+        {
+            // Non-Windows platform or future package change — skip silently.
+        }
+    }
+
+    private void OnUsageNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs args)
+    {
+        var uri = UsageWebView.Source?.ToString()?.TrimEnd('/');
+        if (uri == "https://claude.ai")
+            UsageWebView.Source = new Uri("https://claude.ai/settings/usage");
+    }
+
+    // -------------------------------------------------------------------
+    // Copy screenshot
+    // -------------------------------------------------------------------
+
     private async void OnCopyScreenshotClick(object? sender, RoutedEventArgs e)
     {
         if (SnapshotService is null) return;
-
         var ok = await SnapshotService.CaptureAndCopyAsync(this);
         if (DataContext is MainWindowViewModel vm)
         {

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ComeOnOverDesktopLauncher.ViewModels"
              x:Class="ComeOnOverDesktopLauncher.Views.Controls.LaunchControlsPanel"
@@ -48,6 +48,11 @@
                       FontSize="12"
                       VerticalAlignment="Center"
                       ToolTip.Tip="Captures a live snapshot of each slot's Claude window every refresh interval and shows it alongside the slot stats. Toggle off if you want a minimal launcher or have privacy concerns. Thumbnails are kept in memory only - nothing is written to disk."/>
+            <CheckBox Content="Usage on left"
+                      IsChecked="{Binding UsagePanelOnLeft}"
+                      FontSize="12"
+                      VerticalAlignment="Center"
+                      ToolTip.Tip="When checked, the Claude usage dashboard moves to the left side of the window. Right-click the divider bar to toggle this too."/>
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                 <TextBlock Text="Refresh interval:" FontSize="12" VerticalAlignment="Center"/>
                 <NumericUpDown Value="{Binding Resources.IntervalSeconds}"
