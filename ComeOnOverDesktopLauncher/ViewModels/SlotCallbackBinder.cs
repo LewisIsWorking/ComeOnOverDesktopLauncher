@@ -1,4 +1,4 @@
-using ComeOnOverDesktopLauncher.Core.Models;
+﻿using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.Services.Interfaces;
 
@@ -28,6 +28,7 @@ public static class SlotCallbackBinder
         AppSettings settings,
         IClaudeInstanceLauncher launcher,
         IWindowHider windowHider,
+        IWindowShower windowShower,
         IThumbnailPreviewService previewService,
         Action saveSettings,
         Action refreshResources)
@@ -48,6 +49,11 @@ public static class SlotCallbackBinder
         // the next scanner poll (on its own schedule) will move it
         // into the TrayCard list without us prodding anything.
         slots.OnHideInstance = processId => windowHider.TryHide(processId);
+        // v1.10.6: Show action enumerates hidden top-level windows by PID
+        // and calls ShowWindow(SW_SHOW) + SetForegroundWindow. Same
+        // no-refresh rationale as Hide - the scanner poll handles the
+        // TrayCard -> SlotCard transition on its own schedule.
+        slots.OnShowInstance = processId => windowShower.TryShow(processId);
         slots.OnShowPreview = vm =>
             previewService.Show(vm.ProcessId, vm.Thumbnail, $"Slot {vm.InstanceNumber} - {vm.SlotName}");
     }

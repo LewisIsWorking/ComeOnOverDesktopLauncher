@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ComeOnOverDesktopLauncher.Core.Models;
@@ -70,6 +70,7 @@ public partial class MainWindowViewModel : ObservableObject
         IWindowThumbnailService thumbnailService,
         IThumbnailPreviewService previewService,
         IWindowHider windowHider,
+        IWindowShower windowShower,
         SlotInstanceListViewModel slotInstances,
         ExternalInstanceListViewModel externalInstances,
         ILoggingService logger)
@@ -92,17 +93,17 @@ public partial class MainWindowViewModel : ObservableObject
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
 
         Resources = new MainWindowResourceViewModel(
-            _launcher, resourceMonitor, thumbnailService,
+            resourceMonitor, thumbnailService,
             SlotInstances, ExternalInstances,
             _settings.ResourceRefreshIntervalSeconds,
             () => ThumbnailsEnabled,
             onIntervalChanged: () =>
             {
-                _settings.ResourceRefreshIntervalSeconds = Resources.IntervalSeconds;
+                _settings.ResourceRefreshIntervalSeconds = Resources!.IntervalSeconds;
                 SaveSettings();
             });
 
-        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, windowHider, previewService, SaveSettings, Resources.Refresh);
+        SlotCallbackBinder.Bind(SlotInstances, _settings, _launcher, windowHider, windowShower, previewService, SaveSettings, Resources.Refresh);
         SlotCallbackBinder.BindExternal(ExternalInstances, previewService);
 
         Update = new MainWindowUpdateViewModel(

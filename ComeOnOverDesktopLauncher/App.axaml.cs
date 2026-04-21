@@ -1,4 +1,4 @@
-using System.Runtime.Versioning;
+﻿using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -120,6 +120,7 @@ public partial class App : Application
         services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();
         services.AddSingleton<IUpdateApplyFailureDetector, VelopackLogApplyFailureDetector>();
         services.AddSingleton<IWindowHider, Win32WindowHider>();
+        services.AddSingleton<IWindowShower, Win32WindowShower>();
         services.AddSingleton<IShellLinkWriter, WScriptShellLinkWriter>();
         services.AddSingleton<IIconCacheRefresher, WindowsIconCacheRefresher>();
         services.AddSingleton<IShortcutHealer, WindowsShortcutHealer>();

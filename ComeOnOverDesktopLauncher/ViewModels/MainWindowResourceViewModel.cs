@@ -1,4 +1,4 @@
-using Avalonia.Threading;
+﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ComeOnOverDesktopLauncher.Core.Models;
@@ -39,7 +39,6 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 /// </summary>
 public partial class MainWindowResourceViewModel : ObservableObject
 {
-    private readonly IClaudeInstanceLauncher _launcher;
     private readonly IResourceMonitor _resourceMonitor;
     private readonly IWindowThumbnailService _thumbnailService;
     private readonly SlotInstanceListViewModel _slotInstances;
@@ -61,7 +60,6 @@ public partial class MainWindowResourceViewModel : ObservableObject
     public bool HasRunningInstances => RunningInstanceCount > 0;
 
     public MainWindowResourceViewModel(
-        IClaudeInstanceLauncher launcher,
         IResourceMonitor resourceMonitor,
         IWindowThumbnailService thumbnailService,
         SlotInstanceListViewModel slotInstances,
@@ -70,7 +68,6 @@ public partial class MainWindowResourceViewModel : ObservableObject
         Func<bool> getThumbnailsEnabled,
         Action onIntervalChanged)
     {
-        _launcher = launcher;
         _resourceMonitor = resourceMonitor;
         _thumbnailService = thumbnailService;
         _slotInstances = slotInstances;
@@ -78,7 +75,7 @@ public partial class MainWindowResourceViewModel : ObservableObject
         _getThumbnailsEnabled = getThumbnailsEnabled;
         _onIntervalChanged = onIntervalChanged;
         _intervalSeconds = initialIntervalSeconds;
-        _runningInstanceCount = _launcher.GetRunningInstanceCount();
+        _runningInstanceCount = 0;
 
         _timer = new DispatcherTimer
             { Interval = TimeSpan.FromSeconds(_intervalSeconds) };
@@ -95,12 +92,16 @@ public partial class MainWindowResourceViewModel : ObservableObject
     /// </summary>
     public void Refresh()
     {
-        RunningInstanceCount = _launcher.GetRunningInstanceCount();
         var snapshots = _resourceMonitor.GetSnapshots();
         TotalRamMb = _resourceMonitor.TotalRamMb;
         TotalCpuPercent = _resourceMonitor.TotalCpuPercent;
         _slotInstances.Refresh(snapshots);
         _externalInstances.Refresh(snapshots);
+        // Count after reconciliation so tray-resident slots (which have
+        // no resource snapshot) are included in the running total.
+        RunningInstanceCount = _slotInstances.Items.Count
+            + _slotInstances.TrayItems.Count
+            + _externalInstances.Items.Count;
 
         if (_getThumbnailsEnabled())
         {

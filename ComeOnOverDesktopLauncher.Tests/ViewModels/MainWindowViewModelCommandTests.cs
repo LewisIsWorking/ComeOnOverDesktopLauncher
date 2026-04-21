@@ -1,4 +1,4 @@
-using ComeOnOverDesktopLauncher.Core.Models;
+﻿using ComeOnOverDesktopLauncher.Core.Models;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
@@ -29,15 +29,17 @@ public class MainWindowViewModelCommandTests
     }
 
     [Fact]
-    public void LaunchInstancesCommand_UpdatesRunningInstanceCount()
+    public void LaunchInstancesCommand_TriggersResourceRefresh()
     {
+        // After launch, Refresh() is invoked; RunningInstanceCount is now
+        // derived from collection sizes (not the launcher), so the monitor
+        // being called is the right invariant to assert here.
         _f.Launcher.LaunchInstances(Arg.Any<int>()).Returns([new LaunchSlot(1)]);
-        _f.Launcher.GetRunningInstanceCount().Returns(2);
         var sut = _f.CreateSut();
 
         sut.LaunchInstancesCommand.Execute(null);
 
-        Assert.Equal(2, sut.Resources.RunningInstanceCount);
+        _f.ResourceMonitor.Received(1).GetSnapshots();
     }
 
     [Fact]

@@ -6,6 +6,25 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.6 - Released
+Completes the show/hide-button pair introduced in v1.10.5. Adds a Show button to every TrayCard row so hidden Claude slots can be restored to the foreground directly from the launcher without digging through Claude system-tray menu. Also fixes a latent bug where tray-resident slots were invisible to the resource monitor and were dropped from both collections on the next poll.
+### New IWindowShower service
+- IWindowShower.TryShow(int processId) enumerates all top-level windows via EnumWindows + GetWindowThreadProcessId, selects the best candidate for the target PID, then calls ShowWindow(hwnd, SW_SHOW) and SetForegroundWindow(hwnd). Returns true on success, false on any failure. Never throws.
+- Window selection heuristic: skip WS_EX_TOOLWINDOW windows (Electron renderer helpers), prefer windows with a non-empty title (the main Electron browser window always has a page title), fall back to first remaining match.
+- Managed EnumWindowsProc delegate held in a local variable during enumeration to prevent GC collection mid-callback.
+- SetForegroundWindow can fail silently due to Windows foreground-lock mechanism. Logged but not fought.
+- Separate interface from IWindowHider (single-responsibility: different Win32 footprint, different failure modes).
+### Tray-resident slot visibility fix
+- SlotInstanceListViewModel.Refresh synthesises stub InstanceResourceSnapshot entries for tray-resident PIDs that have no resource snapshot (the resource monitor only snapshots windowed processes). Stubs carry real uptime from ClaudeProcessInfo.StartTime; CPU/RAM show zero.
+- MainWindowResourceViewModel derives RunningInstanceCount from collection sizes after reconciliation (Items.Count + TrayItems.Count + ExternalInstances.Count) instead of IClaudeInstanceLauncher.GetRunningInstanceCount() which only counted windowed processes.
+- MainWindowResourceViewModel no longer depends on IClaudeInstanceLauncher.
+### UI: Show button on TrayCard
+- Teal (hex 80CBC4) Show button in column 3 of the TrayCard stats row. Quit moves to column 4.
+- ClaudeInstanceViewModel.ShowCommand routes through a new OnShow callback, wired by SlotCallbackBinder to IWindowShower.TryShow.
+### Numbers
+- 263 tests passing. 0 warnings, 0 errors.
+- 2 files added (IWindowShower, Win32WindowShower). 7 files modified + 3 test files updated.
+- All files <=200 lines.
 ## v1.10.5 - Released
 
 Adds a Hide button to every slot card so users can close a Claude slot to the system tray without terminating the process. Closes half of the show/hide-button backlog item; the Show-from-tray side remains deferred (requires enumerating hidden top-level windows by PID, which is more complex than Hide).

@@ -1,4 +1,4 @@
-using Avalonia.Media;
+﻿using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -26,6 +26,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
     private readonly Action<int, string>? _onNameChanged;
     private readonly Action<int>? _onKill;
     private readonly Action<int>? _onHide;
+    private readonly Action<int>? _onShow;
     private readonly Action<ClaudeInstanceViewModel>? _onShowPreview;
 
     [ObservableProperty] private int _instanceNumber;
@@ -77,6 +78,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         Action<int, string>? onNameChanged = null,
         Action<int>? onKill = null,
         Action<int>? onHide = null,
+        Action<int>? onShow = null,
         Action<ClaudeInstanceViewModel>? onShowPreview = null)
     {
         _instanceNumber = instanceNumber;
@@ -85,6 +87,7 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         _onNameChanged = onNameChanged;
         _onKill = onKill;
         _onHide = onHide;
+        _onShow = onShow;
         _onShowPreview = onShowPreview;
     }
 
@@ -113,6 +116,18 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         _onHide?.Invoke(ProcessId);
     }
 
+    /// <summary>
+    /// Restores this slot's Claude window from the system tray to the
+    /// foreground. v1.10.6+; routes through a callback supplied by the
+    /// list VM so per-row VMs stay service-free (matches the Kill and
+    /// Hide patterns). On the next scanner poll the slot will move from
+    /// the TrayCard list into the SlotCard list automatically.
+    /// </summary>
+    [RelayCommand]
+    private void Show()
+    {
+        _onShow?.Invoke(ProcessId);
+    }
     /// <summary>
     /// Opens the lightbox-style preview window for this slot's
     /// current <see cref="Thumbnail"/>. No-op if the callback isn't

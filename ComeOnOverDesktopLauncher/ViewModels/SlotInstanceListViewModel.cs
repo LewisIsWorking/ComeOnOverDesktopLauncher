@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
@@ -56,6 +56,7 @@ public partial class SlotInstanceListViewModel : ObservableObject
     public Action<int, string>? OnSlotNameChanged { get; set; }
     public Action<int>? OnKillInstance { get; set; }
     public Action<int>? OnHideInstance { get; set; }
+    public Action<int>? OnShowInstance { get; set; }
     public Action<ClaudeInstanceViewModel>? OnShowPreview { get; set; }
 
     public SlotInstanceListViewModel(
@@ -84,7 +85,21 @@ public partial class SlotInstanceListViewModel : ObservableObject
         try
         {
             var slotByPid = BuildSlotMap();
-            var filtered = FilterAndRelabel(resourceSnapshots, slotByPid);
+            var snapshotPids = resourceSnapshots.Select(s => s.ProcessId).ToHashSet();
+            // Tray-resident PIDs have no snapshot (resource monitor only sees
+            // windowed processes). Synthesise a stub with real uptime so the
+            // TrayCard row is always populated after Hide. CPU/RAM show zero
+            // which is acceptable - the process is idle behind the tray icon.
+            var stubs = slotByPid
+                .Where(kvp => kvp.Value.IsTrayResident && !snapshotPids.Contains(kvp.Key))
+                .Select(kvp => new InstanceResourceSnapshot(
+                    kvp.Key, kvp.Value.SlotNumber, 0, 0,
+                    DateTime.UtcNow - kvp.Value.StartTime))
+                .ToList();
+            var allSnapshots = stubs.Count > 0
+                ? resourceSnapshots.Concat(stubs).ToList()
+                : resourceSnapshots;
+            var filtered = FilterAndRelabel(allSnapshots, slotByPid);
             ReconcileCollection(Items, filtered.Where(s => !s.IsTrayResident).ToList());
             ReconcileCollection(TrayItems, filtered.Where(s => s.IsTrayResident).ToList());
         }
@@ -99,14 +114,14 @@ public partial class SlotInstanceListViewModel : ObservableObject
     /// returns a <c>PID -&gt; (slotNumber, isTrayResident)</c> map for
     /// those that classify as slots. Non-slot processes are absent.
     /// </summary>
-    private IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident)> BuildSlotMap()
+    private IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident, DateTime StartTime)> BuildSlotMap()
     {
         return _scanner.Scan()
-            .Select(p => (p.ProcessId, Slot: _classifier.TryClassifyAsSlot(p)))
+            .Select(p => (p.ProcessId, Slot: _classifier.TryClassifyAsSlot(p), p.StartTime))
             .Where(x => x.Slot is not null)
             .ToDictionary(
                 x => x.ProcessId,
-                x => (x.Slot!.SlotNumber, x.Slot!.IsTrayResident));
+                x => (x.Slot!.SlotNumber, x.Slot!.IsTrayResident, x.StartTime));
     }
 
     /// <summary>
@@ -117,13 +132,13 @@ public partial class SlotInstanceListViewModel : ObservableObject
     /// </summary>
     private static IReadOnlyList<InstanceResourceSnapshot> FilterAndRelabel(
         IReadOnlyList<InstanceResourceSnapshot> snapshots,
-        IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident)> slotByPid)
+        IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident, DateTime StartTime)> slotByPid)
     {
         return snapshots
             .Where(s => slotByPid.ContainsKey(s.ProcessId))
             .Select(s =>
             {
-                var (num, tray) = slotByPid[s.ProcessId];
+                var (num, tray, _) = slotByPid[s.ProcessId];
                 return s with { InstanceNumber = num, IsTrayResident = tray };
             })
             .OrderBy(s => s.InstanceNumber)
@@ -164,6 +179,7 @@ public partial class SlotInstanceListViewModel : ObservableObject
                     (n, v) => OnSlotNameChanged?.Invoke(n, v),
                     p => OnKillInstance?.Invoke(p),
                     p => OnHideInstance?.Invoke(p),
+                    p => OnShowInstance?.Invoke(p),
                     vm => OnShowPreview?.Invoke(vm));
                 target.Add(row);
             }

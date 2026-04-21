@@ -1,4 +1,4 @@
-using ComeOnOverDesktopLauncher.Core.Models;
+﻿using ComeOnOverDesktopLauncher.Core.Models;
 using NSubstitute;
 
 namespace ComeOnOverDesktopLauncher.Tests.ViewModels;
@@ -61,10 +61,12 @@ public class MainWindowViewModelConstructorTests
     }
 
     [Fact]
-    public void Constructor_LoadsRunningInstanceCount()
+    public void Constructor_RunningInstanceCountStartsAtZero()
     {
-        _f.Launcher.GetRunningInstanceCount().Returns(3);
-        Assert.Equal(3, _f.CreateSut().Resources.RunningInstanceCount);
+        // RunningInstanceCount is now derived from collection sizes after
+        // reconciliation rather than from the launcher. Initial value is 0
+        // and updates correctly on the first Refresh() tick.
+        Assert.Equal(0, _f.CreateSut().Resources.RunningInstanceCount);
     }
 
     [Fact]
@@ -82,14 +84,14 @@ public class MainWindowViewModelConstructorTests
     [Fact]
     public void HasRunningInstances_WhenCountIsZero_ReturnsFalse()
     {
-        _f.Launcher.GetRunningInstanceCount().Returns(0);
         Assert.False(_f.CreateSut().Resources.HasRunningInstances);
     }
 
     [Fact]
     public void HasRunningInstances_WhenCountIsPositive_ReturnsTrue()
     {
-        _f.Launcher.GetRunningInstanceCount().Returns(2);
-        Assert.True(_f.CreateSut().Resources.HasRunningInstances);
+        var sut = _f.CreateSut();
+        sut.Resources.RunningInstanceCount = 2;
+        Assert.True(sut.Resources.HasRunningInstances);
     }
 }
