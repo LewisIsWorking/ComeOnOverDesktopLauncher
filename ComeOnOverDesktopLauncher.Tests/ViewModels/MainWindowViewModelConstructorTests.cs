@@ -64,7 +64,7 @@ public class MainWindowViewModelConstructorTests
     public void Constructor_LoadsRunningInstanceCount()
     {
         _f.Launcher.GetRunningInstanceCount().Returns(3);
-        Assert.Equal(3, _f.CreateSut().RunningInstanceCount);
+        Assert.Equal(3, _f.CreateSut().Resources.RunningInstanceCount);
     }
 
     [Fact]
@@ -83,13 +83,13 @@ public class MainWindowViewModelConstructorTests
     public void HasRunningInstances_WhenCountIsZero_ReturnsFalse()
     {
         _f.Launcher.GetRunningInstanceCount().Returns(0);
-        Assert.False(_f.CreateSut().HasRunningInstances);
+        Assert.False(_f.CreateSut().Resources.HasRunningInstances);
     }
 
     [Fact]
     public void HasRunningInstances_WhenCountIsPositive_ReturnsTrue()
     {
         _f.Launcher.GetRunningInstanceCount().Returns(2);
-        Assert.True(_f.CreateSut().HasRunningInstances);
+        Assert.True(_f.CreateSut().Resources.HasRunningInstances);
     }
 }

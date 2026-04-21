@@ -14,7 +14,7 @@
          naturally tiles to 2 columns; it collapses to 1 column when
          the user narrows the window. -->
     <ItemsControl ItemsSource="{Binding SlotInstances.Items}"
-                  IsVisible="{Binding HasRunningInstances}">
+                  IsVisible="{Binding Resources.HasRunningInstances}">
         <ItemsControl.ItemsPanel>
             <ItemsPanelTemplate>
                 <WrapPanel Orientation="Horizontal"/>

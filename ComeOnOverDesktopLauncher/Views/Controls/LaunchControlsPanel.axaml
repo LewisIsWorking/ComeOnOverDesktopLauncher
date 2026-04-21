@@ -50,7 +50,7 @@
                       ToolTip.Tip="Captures a live snapshot of each slot's Claude window every refresh interval and shows it alongside the slot stats. Toggle off if you want a minimal launcher or have privacy concerns. Thumbnails are kept in memory only - nothing is written to disk."/>
             <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                 <TextBlock Text="Refresh interval:" FontSize="12" VerticalAlignment="Center"/>
-                <NumericUpDown Value="{Binding RefreshIntervalSeconds}"
+                <NumericUpDown Value="{Binding Resources.IntervalSeconds}"
                                Minimum="1" Maximum="60"
                                FormatString="0"
                                Width="130"

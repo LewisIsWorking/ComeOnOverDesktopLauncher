@@ -12,21 +12,21 @@
         <Grid ColumnDefinitions="*,*,*,Auto,Auto,Auto">
             <StackPanel Grid.Column="0">
                 <TextBlock Text="Running" FontSize="10" Foreground="Gray"/>
-                <TextBlock Text="{Binding RunningInstanceCount}"
+                <TextBlock Text="{Binding Resources.RunningInstanceCount}"
                            FontSize="16" FontWeight="SemiBold"/>
             </StackPanel>
             <StackPanel Grid.Column="1">
                 <TextBlock Text="Total RAM" FontSize="10" Foreground="Gray"/>
-                <TextBlock Text="{Binding TotalRamMb, StringFormat='{}{0} MB'}"
+                <TextBlock Text="{Binding Resources.TotalRamMb, StringFormat='{}{0} MB'}"
                            FontSize="16" FontWeight="SemiBold"/>
             </StackPanel>
             <StackPanel Grid.Column="2">
                 <TextBlock Text="Total CPU" FontSize="10" Foreground="Gray"/>
-                <TextBlock Text="{Binding TotalCpuPercent, StringFormat='{}{0}%'}"
+                <TextBlock Text="{Binding Resources.TotalCpuPercent, StringFormat='{}{0}%'}"
                            FontSize="16" FontWeight="SemiBold"/>
             </StackPanel>
             <Button Grid.Column="3" Content="?"
-                    Command="{Binding RefreshResourcesCommand}"
+                    Command="{Binding Resources.ManualRefreshCommand}"
                     Padding="8,4" FontSize="13"
                     VerticalAlignment="Center"
                     ToolTip.Tip="Refresh resource stats"/>

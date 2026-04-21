@@ -37,7 +37,7 @@ public class MainWindowViewModelCommandTests
 
         sut.LaunchInstancesCommand.Execute(null);
 
-        Assert.Equal(2, sut.RunningInstanceCount);
+        Assert.Equal(2, sut.Resources.RunningInstanceCount);
     }
 
     [Fact]
@@ -85,10 +85,10 @@ public class MainWindowViewModelCommandTests
         _f.ResourceMonitor.TotalCpuPercent.Returns(8.5);
         var sut = _f.CreateSut();
 
-        sut.RefreshResourcesCommand.Execute(null);
+        sut.Resources.ManualRefreshCommand.Execute(null);
 
-        Assert.Equal(512.0, sut.TotalRamMb);
-        Assert.Equal(8.5, sut.TotalCpuPercent);
+        Assert.Equal(512.0, sut.Resources.TotalRamMb);
+        Assert.Equal(8.5, sut.Resources.TotalCpuPercent);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public class MainWindowViewModelCommandTests
         _f.Scanner.Scan().Returns(Array.Empty<ClaudeProcessInfo>());
         var sut = _f.CreateSut();
 
-        sut.RefreshResourcesCommand.Execute(null);
+        sut.Resources.ManualRefreshCommand.Execute(null);
 
         // Slot VM + external VM both use the scanner on refresh, so we
         // expect at least 2 calls (one from each list VM).
