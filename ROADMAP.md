@@ -120,7 +120,7 @@ Adds a Hide button to every slot card so users can close a Claude slot to the sy
 
 ## Backlog / Under Consideration
 
-- [ ] **Shared extension store across slots** - each `ClaudeSlot{N}\Claude Extensions\` is currently a separate copy of the extension tree. 1.22 GB of duplication measured across ClaudeSlot1-5 on Lewis's machine. Junction points verified working locally. Full design draft with 5 open design questions in [`docs/dev/EXTENSION-STORE.md`](docs/dev/EXTENSION-STORE.md). First step: manually junction one small extension (Filesystem, 12 MB) from slot 2 -> slot 1's copy, verify Claude still loads/uninstalls it cleanly before writing the service layer.
+- [x] **Shared extension store across slots** - CLOSED: junction/symlink approach is not feasible. Windows blocks directory enumeration (FindFirstFileW) on reparse points whose source is inside `%LOCALAPPDATA%` (non-Temp), regardless of ACLs, reparse tag type, or `\\?\` prefix. Since `ClaudeSlot{N}\Claude Extensions\` is always inside `%LOCALAPPDATA%`, Claude's Node.js process cannot enumerate through any junction placed there. Investigated empirically 2026-04-22 - confirmed on Lewis's machine. See `docs/dev/LEARNINGS.md` for full findings. The 1.22 GB duplication remains; a future copy-on-install propagation approach (install in one slot → offer to copy to others) is a different feature with different tradeoffs and could be added as a new backlog item.
 
 - [ ] **Per-slot activity preview** - surface what each slot is doing at a glance. Likely combo: activity signal (CPU %, last-interacted timestamp) always visible + optional thumbnail behind a settings toggle OFF by default. Thumbnails stored in-memory only.
 

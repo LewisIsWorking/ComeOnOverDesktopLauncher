@@ -38,37 +38,31 @@ These come from the project owner and are non-negotiable:
 - **Velopack auto-update** (v1.10.0+): `VelopackApp.Build().Run()` MUST run as the first line of `Program.Main`, before Avalonia boots. Velopack's `UpdateManager` is a concrete type wrapped by our `IAutoUpdateService` adapter for testability. Update orchestration lives in `MainWindowUpdateViewModel` (sub-VM pattern) + `UpdateOrchestrator` (state machine) so `MainWindowViewModel` stays under the 200-line cap. Full design rationale in `docs/dev/VELOPACK.md`.
 - **Self-heal at startup** (v1.10.2+): where an external system (Velopack, Claude Desktop, the Windows Shell) has a known bug that leaves our app in a broken state, we prefer shipping a local heal-on-startup check over waiting for an upstream fix. The pattern: interface + two injectable probes (production resolver + a mock for testing), dev-build guard so `dotnet run` never attempts the heal, defensive `try/catch` at the top of the heal method so a broken probe can't block startup, and an enum return type so callers (and tests) can assert which branch ran. `IShortcutHealer` is the reference implementation.
 
+## NTFS junctions and symlinks inside AppData\Local do not support directory enumeration
+
+Investigated 2026-04-22 during the shared extension store design. **Do not re-investigate — this is a confirmed Windows OS restriction, not a bug we can fix.**
+
+- `GetFileSystemEntries` (`FindFirstFileW`) and `GetChildItem` on a junction or directory symlink located inside `%LOCALAPPDATA%` (but outside `%LOCALAPPDATA%\Temp`) always fail with "Could not find a part of the path", even though `Test-Path` and `GetFileAttributesW` succeed on the same path.
+- Confirmed on Lewis's machine (Windows 11, Developer Mode ON). Not caused by: AppContainer SIDs, spaces in path names, `\\?\` extended prefix, or junction vs symlink reparse tag. A junction FROM `Documents` or `AppData\Roaming` TO `AppData\Local` works fine — the restriction is specifically on junctions whose SOURCE is inside `AppData\Local` (non-Temp).
+- **Consequence for extension store**: `ClaudeSlot{N}\Claude Extensions\` is always inside `AppData\Local`, so any junction/symlink placed there to redirect to a shared store will be unreadable by Claude's Node.js process (which uses the same Win32 `FindFirstFileW` API). The entire junction-based extension deduplication approach is blocked.
+- The backlog item "Shared extension store" has been closed as not feasible via junctions/symlinks. See ROADMAP for the updated note.
+
 ## Diagnostic honesty — lessons from the 2026-04-20 update-failure investigation
 
-These come from a session where I called a reproducible bug "transient", mistook a dev build for the installed version, and churned on half-fixes. Future-me, don't do these:
-
-- **"Transient" is a conclusion, not an opening hypothesis.** When an update, install, or external system fails, the first instinct shouldn't be "maybe it's flaky, retry" — it should be "what evidence tells me *why* it failed?". Cheap diagnostics FIRST: read the relevant log (Velopack writes to `%LOCALAPPDATA%\<AppName>\velopack.log`, CoODL writes to `%APPDATA%\<AppName>\logs\`), run `handle64.exe` from Sysinternals (downloadable from `https://live.sysinternals.com/handle64.exe`) against the install dir to find file locks, check process trees with `Get-WmiObject Win32_Process`. A retry without evidence wastes the user's time and erodes their trust. Two consecutive failures with identical symptoms = reproducible bug, not flake.
-
-- **Dev builds can impersonate the installed version.** A `dotnet run` in `bin\Debug\net10.0\` produces an .exe that shows the same version footer as the installed Velopack build (because both read the same csproj `<Version>`). The ONLY reliable way to distinguish them is the binary path:
-  - Installed: `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\current\ComeOnOverDesktopLauncher.exe`
-  - Dev build: `...\RiderProjects\ComeOnOverDesktopLauncher\ComeOnOverDesktopLauncher\bin\Debug\net10.0\ComeOnOverDesktopLauncher.exe`
-  Before claiming "update succeeded, user is now on vX.Y.Z", ALWAYS check `Get-Process ComeOnOverDesktopLauncher | Select-Object Path` AND `[System.IO.File]::GetLastWriteTime` on the installed exe. If the install-dir exe's mtime pre-dates the release commit, the update did NOT apply regardless of what the UI footer says. I made this mistake twice in one session. Kill stray dev builds before diagnostic work.
-
-- **Velopack silently relaunches the old version on apply failure.** The `UpdateManager.ApplyUpdatesAndRestart()` call is documented as "never returns" because it exits the process. What's NOT documented: when apply fails (e.g. backup-and-swap hits "file in use"), Velopack *catches the error internally*, logs `[ERROR] Apply error:` to `velopack.log`, and relaunches the ORIGINAL exe. The launcher code sees a successful restart into the old version — no exception is thrown on the C# side. **The only signal available is the Velopack log**. Detection pattern for v1.10.4+: read the tail of `%LOCALAPPDATA%\<AppName>\velopack.log` on startup, look for `[ERROR] Apply error:` with timestamp within the last ~2 minutes. See the `IUpdateApplyFailureDetector` design in the v1.10.4 roadmap entry.
-
-- **Velopack's 10×1s retry window on backup is often too short.** The apply step extracts 237 files to `packages\VelopackTemp\` then tries to move `current\` to a backup. Windows Defender's real-time scan can hold read handles on the fresh files for 10-15 seconds after write, causing the move to fail. Observed on Lewis's machine, three identical failures in a row, same minute. `handle64.exe` found no holders when the launcher was dead, confirming the lock is grabbed DURING Velopack's apply, not before. Also affects `Setup.exe --silent` which uses the same apply codepath. Full context in the v1.10.4 roadmap entry.
-
-- **"Continue" isn't always the right response to a stuck investigation.** When a fix attempt fails, stop and write a plan BEFORE another attempt. I burned several turns trying slightly-different fixes when I should have stopped after the second failure to write the proper diagnostic + design doc. The user had to explicitly tell me to stop. Signs to stop: repeated failures with the same symptom; speculating about causes rather than measuring; running out of tokens while still flailing. Better to ship a honest roadmap entry + one well-designed follow-up than three half-implementations.
+- **"Transient" is a conclusion, not an opening hypothesis.** Cheap diagnostics FIRST: read the relevant log, run `handle64.exe`, check process trees. A retry without evidence wastes the user's time. Two consecutive failures with identical symptoms = reproducible bug, not flake.
+- **Dev builds can impersonate the installed version.** A `dotnet run` produces an .exe showing the same version footer as the Velopack build. ONLY check via `Get-Process ComeOnOverDesktopLauncher | Select-Object Path` and `GetLastWriteTime` on the installed exe. Kill stray dev builds before diagnostic work.
+- **Velopack silently relaunches the old version on apply failure.** When apply fails, Velopack logs `[ERROR] Apply error:` to `velopack.log` and relaunches the original exe. No C# exception is thrown. The only signal is the log. Detection pattern lives in `IUpdateApplyFailureDetector` (v1.10.4+).
+- **"Continue" isn't always the right response to a stuck investigation.** Stop after the second identical failure and write a plan. Signs to stop: repeated same-symptom failures; speculating instead of measuring; running low on tokens while still flailing.
 
 ## Avalonia.Controls.WebView - type name resolution
-Added in v1.10.7. Key facts for future sessions:
-- Package: Avalonia.Controls.WebView 12.0.0. The NuGet name is NOT Avalonia.WebView or WebView.Avalonia (both wrong - the former doesn't exist, the latter is a dead third-party package).
-- NativeWebView is in the Avalonia.Controls namespace - no extra using needed.
-- WebViewNavigationCompletedEventArgs is also in Avalonia.Controls - discovered from build error AVLN3000.
-- WindowsWebView2EnvironmentRequestedEventArgs exists in the DLL but its namespace was not findable in the v1.10.7 session. Workaround: set UserDataFolder via reflection (args.GetType().GetProperty("UserDataFolder")?.SetValue(args, path)) inside EnvironmentRequested handler. Try-catch makes it a silent no-op on failure.
-- No AppBuilder extension (UseDesktopWebView etc.) needed for Avalonia.Controls.WebView 12.0.0 - just add the package and use NativeWebView in XAML.
+Added in v1.10.7. Package: `Avalonia.Controls.WebView 12.0.0`. `NativeWebView` is in the `Avalonia.Controls` namespace. `WebViewNavigationCompletedEventArgs` also in `Avalonia.Controls`. Set `UserDataFolder` via reflection inside `EnvironmentRequested` handler (avoids needing `WindowsWebView2EnvironmentRequestedEventArgs` type name). No `AppBuilder` extension needed — just add the package and use `NativeWebView` in XAML.
+
 ## Memory / mental model
 
 - The user runs the CoODL launcher on Windows (Dell laptop is Linux but not the target).
 - ClaudeSlot{N} data directories live at `%LOCALAPPDATA%\ClaudeSlot{N}\`.
 - Seed cache is at `%APPDATA%\ComeOnOverDesktopLauncher\seed\`.
 - Logs are at `%APPDATA%\ComeOnOverDesktopLauncher\logs\launcher-YYYY-MM-DD.log`.
-- The user is on mobile often but this specific project is exclusively Windows-local (not GitHub API).
 - User's Windows GitHub Desktop is the shiftkey fork v3.4.12-linux1.
 - AutoHotkey v2 script at `C:\Users\Lewis\Documents\AutoHotkey\Continue.ahk`.
-- The user has a multi-monitor setup. The primary monitor is 2560x1440. Automated clicks via `mouse_event` + `SetCursorPos` can mis-target on high-DPI primary monitors; prefer `Windows-MCP:Click` tool which handles DPI correctly, or use the secondary monitor for live-verify runs.
+- The user has a multi-monitor setup. Primary monitor is 2560x1440. Prefer `Windows-MCP:Click` tool for automated clicks (handles DPI correctly).
