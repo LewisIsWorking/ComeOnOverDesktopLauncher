@@ -1,0 +1,32 @@
+#!/bin/sh
+# CoODL pre-push hook: runs the full test suite before every push.
+# If any test fails, the push is aborted and the failure is shown.
+#
+# INSTALLATION (run once from repo root):
+#   cp docs/dev/hooks/pre-push .git/hooks/pre-push
+#   chmod +x .git/hooks/pre-push   # Unix/macOS only
+#
+# Git for Windows runs the hook via its bundled sh.exe automatically —
+# no chmod needed on Windows.
+#
+# To bypass in a genuine emergency: git push --no-verify
+# (never do this to skip a failing test — fix the test first)
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+echo "[pre-push] Running test suite..."
+cd "$REPO_ROOT" || exit 1
+
+dotnet test --verbosity quiet 2>&1
+STATUS=$?
+
+if [ $STATUS -ne 0 ]; then
+    echo ""
+    echo "[pre-push] PUSH ABORTED: one or more tests failed."
+    echo "           Fix the failing tests before pushing."
+    echo "           To bypass (emergencies only): git push --no-verify"
+    exit 1
+fi
+
+echo "[pre-push] All tests passed. Push proceeding."
+exit 0

@@ -2,7 +2,19 @@
 
 Extracted from `LEARNINGS.md` during v1.9.2 to keep the root file under the 200-line limit. These are accumulated gotchas from doing releases of this codebase.
 
-## Line-count audit command
+## Git hooks (one-time setup per clone)
+The repo ships a `pre-push` hook in `docs/dev/hooks/` that runs the full test suite before every push. Install it once after cloning:
+```powershell
+# Windows (Git for Windows -- no chmod needed, sh.exe runs it automatically)
+Copy-Item docs\dev\hooks\pre-push .git\hooks\pre-push
+```
+```bash
+# Unix / macOS
+cp docs/dev/hooks/pre-push .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+The hook runs `dotnet test --verbosity quiet`. If any test fails the push is aborted. To bypass in a genuine emergency: `git push --no-verify` (fix the test, don't skip it).
+The hook is not auto-installed by git on clone ÔÇö it lives in `docs/dev/hooks/` rather than `.git/hooks/` so it's tracked in version control and survives re-clones.## Line-count audit command
 
 Run this any time you suspect drift. It's also what the CI guard (`FileSizeLimitTests`) checks:
 
