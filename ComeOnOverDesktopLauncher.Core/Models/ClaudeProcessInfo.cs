@@ -18,9 +18,19 @@ namespace ComeOnOverDesktopLauncher.Core.Models;
 /// record is even built, so in practice <c>!IsWindowed</c> on a record
 /// returned by the scanner means "tray-resident slot main".
 /// </para>
+///
+/// <para>
+/// <see cref="ChildProcessIds"/> holds the PIDs of all direct and
+/// indirect child claude.exe processes (renderer, GPU, crashpad,
+/// network service, node-service, etc.). Used by
+/// <see cref="ViewModels.SlotInstanceListViewModel"/> to aggregate
+/// RAM and CPU stats across the full Electron process tree so per-slot
+/// cards match what Windows Task Manager reports. Added in v1.10.9.
+/// </para>
 /// </summary>
 public record ClaudeProcessInfo(
     int ProcessId,
     string CommandLine,
     DateTime StartTime,
-    bool IsWindowed = true);
+    bool IsWindowed = true,
+    IReadOnlyList<int>? ChildProcessIds = null);

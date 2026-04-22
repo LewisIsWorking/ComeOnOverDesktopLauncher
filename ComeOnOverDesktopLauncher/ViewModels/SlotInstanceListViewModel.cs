@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
@@ -6,31 +6,18 @@ using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
-/// Owns the list of launcher-managed Claude slots - Claude processes
-/// whose command line carries <c>--user-data-dir=...\ClaudeSlotN</c>.
+/// Owns the list of launcher-managed Claude slots.
+/// Splits running slots across <see cref="Items"/> (windowed) and
+/// <see cref="TrayItems"/> (tray-resident) and reconciles both
+/// in-place on every poll tick.
 ///
-/// <para>
-/// Slots are split across two collections based on window visibility:
-/// <see cref="Items"/> holds visible (windowed) slot rows rendered in
-/// the main per-slot list, and <see cref="TrayItems"/> holds tray-
-/// resident (close-to-tray'd) slot rows rendered in a separate
-/// "Hidden / tray" section. Every launcher-managed slot appears in
-/// exactly one of the two, never both.
-/// </para>
-///
-/// <para>
-/// The <c>IsTrayResident</c> bit comes from
-/// <see cref="IClaudeProcessClassifier.TryClassifyAsSlot"/>, which
-/// derives it from <c>ClaudeProcessInfo.IsWindowed</c> set by the
-/// scanner. The view layer does no classification of its own.
-/// </para>
-///
-/// <para>
-/// Each snapshot's <c>InstanceNumber</c> is rewritten to the real
-/// slot number extracted from its command line, so slot 3 renders as
-/// "Slot 3" even when slots 1 and 2 are closed - the previous
-/// sequential-enumeration approach mis-labelled this case.
-/// </para>
+/// <para>v1.10.9: per-slot RAM and CPU now aggregate the full Electron
+/// process tree (renderer, GPU, crashpad, etc.) so slot cards match
+/// Windows Task Manager. Child PIDs come from
+/// <see cref="ClaudeProcessInfo.ChildProcessIds"/> populated by the
+/// WMI scanner; <see cref="AggregateChildSnapshots"/> sums them into
+/// the main-process snapshot before <see cref="FilterAndRelabel"/>
+/// filters to slot PIDs only.</para>
 /// </summary>
 public partial class SlotInstanceListViewModel : ObservableObject
 {
@@ -39,17 +26,8 @@ public partial class SlotInstanceListViewModel : ObservableObject
     private readonly ISlotInitialiser _slotInitialiser;
     private readonly ILoggingService _logger;
 
-    /// <summary>Visible (windowed) slot rows. Mutated in-place during
-    /// <see cref="Refresh"/> to preserve Avalonia binding identity.</summary>
     public ObservableCollection<ClaudeInstanceViewModel> Items { get; } = new();
-
-    /// <summary>Tray-resident (close-to-tray'd) slot rows. Mutated
-    /// in-place during <see cref="Refresh"/>.</summary>
     public ObservableCollection<ClaudeInstanceViewModel> TrayItems { get; } = new();
-
-    /// <summary>True when any slot is currently close-to-tray'd. Drives
-    /// the IsVisible of the "Hidden / tray" section so it only appears
-    /// when there's something to show.</summary>
     public bool HasTrayItems => TrayItems.Count > 0;
 
     public Func<int, string>? GetSlotName { get; set; }
@@ -72,24 +50,16 @@ public partial class SlotInstanceListViewModel : ObservableObject
         TrayItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasTrayItems));
     }
 
-    /// <summary>
-    /// Rescans running Claude processes, filters to launcher-managed
-    /// slots, and reconciles both <see cref="Items"/> and
-    /// <see cref="TrayItems"/> in-place. Swallows scan exceptions and
-    /// logs a warning rather than propagating: a transient WMI hiccup
-    /// should not take down the poll tick. Previous state is preserved
-    /// in that case.
-    /// </summary>
     public void Refresh(IReadOnlyList<InstanceResourceSnapshot> resourceSnapshots)
     {
         try
         {
-            var slotByPid = BuildSlotMap();
+            var scanResults = _scanner.Scan();
+            var slotByPid = BuildSlotMap(scanResults);
             var snapshotPids = resourceSnapshots.Select(s => s.ProcessId).ToHashSet();
-            // Tray-resident PIDs have no snapshot (resource monitor only sees
-            // windowed processes). Synthesise a stub with real uptime so the
-            // TrayCard row is always populated after Hide. CPU/RAM show zero
-            // which is acceptable - the process is idle behind the tray icon.
+
+            // Synthesise stubs for tray-resident slots (windowed-only monitor
+            // has no snapshot for them). Real uptime, zero CPU/RAM.
             var stubs = slotByPid
                 .Where(kvp => kvp.Value.IsTrayResident && !snapshotPids.Contains(kvp.Key))
                 .Select(kvp => new InstanceResourceSnapshot(
@@ -99,7 +69,11 @@ public partial class SlotInstanceListViewModel : ObservableObject
             var allSnapshots = stubs.Count > 0
                 ? resourceSnapshots.Concat(stubs).ToList()
                 : resourceSnapshots;
-            var filtered = FilterAndRelabel(allSnapshots, slotByPid);
+
+            // Aggregate child-process stats into each main slot snapshot so
+            // per-slot cards show full-tree totals (matching Task Manager).
+            var aggregated = AggregateChildSnapshots(allSnapshots, scanResults);
+            var filtered = FilterAndRelabel(aggregated, slotByPid);
             ReconcileCollection(Items, filtered.Where(s => !s.IsTrayResident).ToList());
             ReconcileCollection(TrayItems, filtered.Where(s => s.IsTrayResident).ToList());
         }
@@ -109,14 +83,14 @@ public partial class SlotInstanceListViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// Scans all main Claude processes (windowed or tray-resident) and
-    /// returns a <c>PID -&gt; (slotNumber, isTrayResident)</c> map for
-    /// those that classify as slots. Non-slot processes are absent.
-    /// </summary>
-    private IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident, DateTime StartTime)> BuildSlotMap()
+    // -------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------
+
+    private IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident, DateTime StartTime)>
+        BuildSlotMap(IReadOnlyList<ClaudeProcessInfo> scanResults)
     {
-        return _scanner.Scan()
+        return scanResults
             .Select(p => (p.ProcessId, Slot: _classifier.TryClassifyAsSlot(p), p.StartTime))
             .Where(x => x.Slot is not null)
             .ToDictionary(
@@ -125,11 +99,45 @@ public partial class SlotInstanceListViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Keeps only snapshots whose PID maps to a known slot, rewrites
-    /// <c>InstanceNumber</c> to the real slot number, propagates the
-    /// <c>IsTrayResident</c> bit from the classifier, and sorts by slot
-    /// number so both collections render 1, 3, 5… in order.
+    /// Sums RAM and CPU from each slot's child processes into the main
+    /// process snapshot. Children not present in <paramref name="snapshots"/>
+    /// (e.g. already exited) are silently skipped.
     /// </summary>
+    internal static IReadOnlyList<InstanceResourceSnapshot> AggregateChildSnapshots(
+        IReadOnlyList<InstanceResourceSnapshot> snapshots,
+        IReadOnlyList<ClaudeProcessInfo> scanResults)
+    {
+        if (scanResults.All(p => p.ChildProcessIds is null or { Count: 0 }))
+            return snapshots;
+
+        var byPid = snapshots.ToDictionary(s => s.ProcessId);
+        var result = snapshots.ToList();
+
+        foreach (var proc in scanResults)
+        {
+            if (proc.ChildProcessIds is not { Count: > 0 }) continue;
+            if (!byPid.TryGetValue(proc.ProcessId, out var main)) continue;
+
+            var extraRam = 0L;
+            var extraCpu = 0.0;
+            foreach (var childPid in proc.ChildProcessIds)
+            {
+                if (!byPid.TryGetValue(childPid, out var child)) continue;
+                extraRam += child.RamBytes;
+                extraCpu += child.CpuPercent;
+            }
+
+            if (extraRam == 0 && extraCpu == 0.0) continue;
+            var idx = result.IndexOf(main);
+            result[idx] = main with
+            {
+                RamBytes = main.RamBytes + extraRam,
+                CpuPercent = Math.Round(main.CpuPercent + extraCpu, 1)
+            };
+        }
+        return result;
+    }
+
     private static IReadOnlyList<InstanceResourceSnapshot> FilterAndRelabel(
         IReadOnlyList<InstanceResourceSnapshot> snapshots,
         IReadOnlyDictionary<int, (int SlotNumber, bool IsTrayResident, DateTime StartTime)> slotByPid)
@@ -145,27 +153,16 @@ public partial class SlotInstanceListViewModel : ObservableObject
             .ToList();
     }
 
-    /// <summary>
-    /// In-place reconciliation of one target collection against a
-    /// filtered snapshot list. Removes rows whose slot numbers are
-    /// gone (handles middle-slot disappearance correctly), adds rows
-    /// for newly-seen slot numbers, and updates resource fields on
-    /// everyone. Preserves object identity for existing rows so
-    /// binding state (edit-in-progress name text, etc.) survives.
-    /// Used for both <see cref="Items"/> and <see cref="TrayItems"/>.
-    /// </summary>
     private void ReconcileCollection(
         ObservableCollection<ClaudeInstanceViewModel> target,
         IReadOnlyList<InstanceResourceSnapshot> filtered)
     {
         var wantedSlots = filtered.Select(s => s.InstanceNumber).ToHashSet();
-
         for (var i = target.Count - 1; i >= 0; i--)
         {
             if (!wantedSlots.Contains(target[i].InstanceNumber))
                 target.RemoveAt(i);
         }
-
         foreach (var snap in filtered)
         {
             var row = target.FirstOrDefault(vm => vm.InstanceNumber == snap.InstanceNumber);

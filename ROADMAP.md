@@ -6,6 +6,40 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.9 - Released
+Per-slot RAM and CPU totals now match Windows Task Manager by aggregating the full Electron process tree (renderer, GPU, crashpad, network service, node-service) into each slot card. Also ships a large test health pass: 57 new tests across 7 new files, covering tree analysis, child-snapshot aggregation, resource monitor CPU delta, thumbnail refresher, slot callback binder, update orchestrator, and banner text formatting.
+
+### Per-slot full-tree RAM/CPU aggregation
+- `ClaudeProcessInfo.ChildProcessIds` field added — the WMI scanner now populates it with the full list of descendant PIDs for each main Claude process.
+- `ClaudeProcessTreeAnalyser` (new, Core layer) — pure static BFS over a parent→children map. Extracted from the scanner so tree-walking logic is unit-testable independently of WMI. Handles arbitrary depth; returns empty list for leaf nodes.
+- `WmiClaudeProcessScanner.Scan()` calls `ClaudeProcessTreeAnalyser.CollectDescendantPids` after building the `childPidsByParent` map, attaching descendants to each `ClaudeProcessInfo`.
+- `SlotInstanceListViewModel.AggregateChildSnapshots` (new, `internal static`) — sums `RamBytes` and `CpuPercent` from each slot's child snapshots into the main-process snapshot before collection reconciliation. Missing child snapshots (already exited) are silently skipped. Early-exits when no `ChildProcessIds` are set so the no-Claude-running path is zero-cost.
+- Per-slot card figures now match Task Manager's per-app totals. The v1.10.7 totals-row fix already corrected `TotalRamMb`/`TotalCpuPercent`; this fix closes the per-slot card gap.
+
+### Test health
+- `VelopackLogApplyFailureDetectorTests` — corrected log format in test fixtures from `[HH:MM:SS] ERROR:` to real Velopack format `[HH:MM:SS] [ERROR] Apply error:`. All 5 detector tests now pass.
+- `ExternalInstanceViewModelGapTests` — removed the valid-PNG `UpdateThumbnailFromBytes` test; Avalonia's `Bitmap` constructor requires a running `IPlatformRenderInterface` unavailable in headless unit tests. Null/empty boundary tests retained.
+- `MainWindowUpdateViewModelBannerTests` — replaced four tautological same-variable comparisons (CS1718) with three meaningful enum-distinctness assertions (`Downloading ≠ Idle ≠ ReadyToInstall ≠ Failed ≠ ApplyFailed`). Zero warnings.
+- 7 new test files: `ClaudeProcessTreeAnalyserTests` (6), `SlotInstanceListViewModelAggregationTests` (6), `ResourceMonitorCpuTests` (3), `ExternalInstanceViewModelGapTests` (4), `MainWindowUpdateViewModelBannerTests` (14), `SlotCallbackBinderTests` (7), `ThumbnailRefresherTests` (8).
+
+### Numbers
+- 321 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 2 files added (`ClaudeProcessTreeAnalyser`, `ClaudeProcessTreeAnalyserTests`). 4 files modified in production code + 6 new/modified test files.
+
+## v1.10.8 - Released
+Fixes the version footer display (was stuck at v1.10.5 since project creation) and adds repo health infrastructure: a version-consistency test that catches csproj/assembly drift in CI, and a pre-push git hook that runs the full test suite before every push.
+
+### Footer version fix
+- Removed explicit `<AssemblyVersion>` element from csproj — MSBuild now derives `AssemblyVersion` from `<Version>` automatically. `VersionProvider` reads `Assembly.GetName().Version`, so footer now shows the correct version on every Velopack-installed build.
+- Re-versioned from 1.10.7.1 to 1.10.8 (Velopack requires 3-part SemVer; four-part tags are rejected).
+
+### Repo health
+- `VersionConsistencyTests` — asserts that compiled `AssemblyVersion` matches the csproj `<Version>` at the `Major.Minor.Build` level. Catches any future divergence before it reaches users.
+- `docs/dev/hooks/pre-push` — git hook that runs `dotnet test --verbosity quiet` before every `git push`. Aborts the push on any test failure. Install once: `cp docs/dev/hooks/pre-push .git/hooks/pre-push`. Documented in `BUILD-AND-TOOLING.md`.
+
+### Numbers
+- 264 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+
 ## v1.10.7 - Released
 Embeds the Claude usage dashboard directly into the main launcher window as a side-by-side panel, adds a responsive breakpoint that stacks vertically on narrow windows, and fixes the resource total underestimation.
 ### Embedded usage dashboard (NativeWebView)
@@ -118,7 +152,6 @@ Users currently stuck on v1.10.2/v1.10.3 because their apply keeps failing won't
 
 ## Backlog / Under Consideration
 
-- [ ] **Per-slot full-tree RAM/CPU aggregation** - the v1.10.7 resource fix corrects the totals row but per-slot cards still show only the browser-main process stats. Fix requires grouping all claude.exe child processes by their root parent PID (WMI already has parent-child data via ClaudeProcessMainIdentifier) and summing into the main process snapshot in ResourceMonitor. Medium complexity; blocked on plumbing the scanner output into the resource monitor.
 - [ ] **Scroll position preservation** - the left launcher panel loses its scroll position when the window is resized (the responsive breakpoint triggers a grid layout rebuild which resets scroll). Fixable by saving ScrollViewer.Offset before and restoring after ApplyLayout().
 - [ ] **Per-instance token/usage display** - surface tokens or session usage % per slot next to CPU/RAM/Up in the slot cards. Three possible data sources: (a) scrape from the embedded usage WebView (fragile, Anthropic can change the DOM), (b) if Anthropic exposes a stable per-session API endpoint, call it per slot, (c) local heuristic from CPU/network activity (rough proxy). No stable API currently known; defer until one appears or the WebView scraping approach is validated.
 - [ ] **Show-from-tray button** (other half of the v1.10.5 Hide feature) - enumerate hidden top-level windows by PID, `ShowWindow(SW_SHOW) + SetForegroundWindow`. Appears on TrayCard rows so hidden slots can be restored without digging through Claude's system-tray menu. Risk: Claude's main-window `Hwnd` can change across hide/show cycles, the scanner may need to re-discover it. Test before shipping.

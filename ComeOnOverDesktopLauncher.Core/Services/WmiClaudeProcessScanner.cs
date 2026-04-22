@@ -35,6 +35,12 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// the flag, extracts <c>--user-data-dir=...</c> from any child and
 /// appends it.
 ///
+/// <b>Child PID aggregation (v1.10.9):</b> After identifying mains,
+/// <see cref="ClaudeProcessTreeAnalyser.CollectDescendantPids"/> walks
+/// the full process subtree so <see cref="SlotInstanceListViewModel"/>
+/// can sum RAM and CPU across all Electron child processes, matching
+/// the per-app total Windows Task Manager shows.
+///
 /// WMI is currently the only reliable way to read another process's
 /// command line on Windows from managed code.
 /// </summary>
@@ -64,6 +70,10 @@ public class WmiClaudeProcessScanner : IClaudeProcessScanner
         var childrenByParent = all
             .GroupBy(p => p.ParentPid)
             .ToDictionary(g => g.Key, g => (IReadOnlyList<ProcessRecord>)g.ToList());
+        // Pid-only map for ClaudeProcessTreeAnalyser (pure function, testable).
+        var childPidsByParent = childrenByParent.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlyList<int>)kvp.Value.Select(r => r.Pid).ToList());
 
         var results = new List<ClaudeProcessInfo>();
         foreach (var pid in mainPids)
@@ -73,8 +83,13 @@ public class WmiClaudeProcessScanner : IClaudeProcessScanner
 
             var effectiveCmdline = EnrichWithUserDataDir(self, childrenByParent);
             var isWindowed = windowedPids.Contains(pid);
+            // Collect ALL descendant PIDs (renderer, GPU, crashpad, etc.) so
+            // SlotInstanceListViewModel can aggregate their RAM/CPU into the
+            // per-slot card total, matching what Windows Task Manager shows.
+            var descendants = ClaudeProcessTreeAnalyser.CollectDescendantPids(
+                pid, childPidsByParent);
             results.Add(new ClaudeProcessInfo(
-                pid, effectiveCmdline, TryGetStartTime(pid), isWindowed));
+                pid, effectiveCmdline, TryGetStartTime(pid), isWindowed, descendants));
         }
 
         return results;

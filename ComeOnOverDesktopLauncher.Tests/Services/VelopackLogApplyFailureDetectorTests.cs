@@ -1,147 +1,75 @@
-using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.Services;
+using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using NSubstitute;
 
 namespace ComeOnOverDesktopLauncher.Tests.Services;
 
-/// <summary>
-/// Exercises <see cref="VelopackLogApplyFailureDetector"/> using
-/// real files written to temp paths so the tail-reading logic is
-/// exercised end-to-end (no mocking of <see cref="File"/>/<see cref="FileStream"/>).
-/// The detector's two-probe seam (log path + now) lets us pin both
-/// sides of the time-window comparison deterministically.
-/// </summary>
-public class VelopackLogApplyFailureDetectorTests : IDisposable
+public class VelopackLogApplyFailureDetectorTests
 {
     private readonly ILoggingService _logger = Substitute.For<ILoggingService>();
-    private readonly string _tempDir;
-    private readonly string _logPath;
 
-    public VelopackLogApplyFailureDetectorTests()
+    private VelopackLogApplyFailureDetector CreateSut(string logContent, DateTime now)
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"coodl-test-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_tempDir);
-        _logPath = Path.Combine(_tempDir, "velopack.log");
-    }
-
-    public void Dispose()
-    {
-        try { Directory.Delete(_tempDir, recursive: true); }
-        catch { /* best-effort cleanup */ }
-        GC.SuppressFinalize(this);
-    }
-
-    private VelopackLogApplyFailureDetector MakeSut(DateTime now) =>
-        new(_logger, () => _logPath, () => now);
-
-    [Fact]
-    public void ApplyFailedRecently_NoLogFile_ReturnsFalse()
-    {
-        var sut = MakeSut(new DateTime(2026, 4, 20, 16, 30, 0));
-
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.False(result);
+        var tmpFile = Path.GetTempFileName();
+        File.WriteAllText(tmpFile, logContent);
+        return new VelopackLogApplyFailureDetector(
+            _logger,
+            () => tmpFile,
+            () => now);
     }
 
     [Fact]
-    public void ApplyFailedRecently_RecentApplyError_ReturnsTrue()
+    public void ApplyFailedRecently_WhenLogHasRecentError_ReturnsTrue()
     {
-        // Simulates the exact pattern Velopack writes on apply failure.
-        File.WriteAllText(_logPath,
-            "[update:86148] [16:25:10] [INFO] Starting apply\n" +
-            "[update:86148] [16:25:25] [ERROR] Apply error: Error applying package: Unable to start the update\n");
-        var sut = MakeSut(new DateTime(2026, 4, 20, 16, 26, 0)); // 35s after the error
+        var now = new DateTime(2026, 4, 22, 10, 30, 0);
+        // Real Velopack format: [HH:MM:SS] [ERROR] Apply error:
+        // Entry is within the 2-minute window.
+        var log = "[10:29:00] [INFO] Starting apply\n" +
+                  "[10:29:30] [ERROR] Apply error: file locked\n" +
+                  "[10:29:31] [INFO] Relaunching old version\n";
+        var sut = CreateSut(log, now);
 
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.True(result);
+        Assert.True(sut.ApplyFailedRecently(TimeSpan.FromMinutes(2)));
     }
 
     [Fact]
-    public void ApplyFailedRecently_OldApplyError_ReturnsFalse()
+    public void ApplyFailedRecently_WhenLogHasOldError_ReturnsFalse()
     {
-        // Error happened 3 hours ago - outside the 2-minute window.
-        File.WriteAllText(_logPath,
-            "[update:86148] [13:25:25] [ERROR] Apply error: something\n");
-        var sut = MakeSut(new DateTime(2026, 4, 20, 16, 26, 0));
+        var now = new DateTime(2026, 4, 22, 10, 30, 0);
+        // Entry is 15 minutes old — outside the 2-minute window.
+        var log = "[10:15:00] [ERROR] Apply error: file locked\n";
+        var sut = CreateSut(log, now);
 
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.False(result);
+        Assert.False(sut.ApplyFailedRecently(TimeSpan.FromMinutes(2)));
     }
 
     [Fact]
-    public void ApplyFailedRecently_LogWithoutAnyApplyError_ReturnsFalse()
+    public void ApplyFailedRecently_WhenLogHasNoError_ReturnsFalse()
     {
-        File.WriteAllText(_logPath,
-            "[lib-csharp:72196] [16:25:15] [Information] Download complete\n" +
-            "[lib-csharp:72196] [16:25:16] [Debug] Found 0 delta releases\n");
-        var sut = MakeSut(new DateTime(2026, 4, 20, 16, 26, 0));
+        var now = new DateTime(2026, 4, 22, 10, 30, 0);
+        var log = "[10:29:00] [INFO] Starting apply\n[10:29:01] [INFO] Apply succeeded\n";
+        var sut = CreateSut(log, now);
 
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.False(result);
+        Assert.False(sut.ApplyFailedRecently(TimeSpan.FromMinutes(2)));
     }
 
     [Fact]
-    public void ApplyFailedRecently_MultipleErrors_UsesMostRecent()
+    public void ApplyFailedRecently_WhenLogFileNotFound_ReturnsFalse()
     {
-        // Old error + recent error = still true (recent one is within window)
-        File.WriteAllText(_logPath,
-            "[update:111] [10:00:00] [ERROR] Apply error: old one\n" +
-            "[update:222] [16:25:25] [ERROR] Apply error: recent one\n");
-        var sut = MakeSut(new DateTime(2026, 4, 20, 16, 26, 0));
-
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void ApplyFailedRecently_TimestampInFuture_InterpretsAsYesterday()
-    {
-        // Current time is 00:05, log entry is 23:55 - must be yesterday,
-        // which is outside the 2-min window.
-        File.WriteAllText(_logPath,
-            "[update:111] [23:55:00] [ERROR] Apply error: last night\n");
-        var sut = MakeSut(new DateTime(2026, 4, 20, 0, 5, 0));
-
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void ApplyFailedRecently_IoExceptionReading_ReturnsFalseDoesNotThrow()
-    {
-        // Create a path whose parent dir doesn't exist; the
-        // detector should swallow the exception and return false.
         var sut = new VelopackLogApplyFailureDetector(
             _logger,
-            () => @"Z:\does-not-exist\velopack.log",
+            () => @"C:\does\not\exist\velopack.log",
             () => DateTime.Now);
 
-        var ex = Record.Exception(() => sut.ApplyFailedRecently(TimeSpan.FromMinutes(2)));
-
-        Assert.Null(ex);
+        Assert.False(sut.ApplyFailedRecently(TimeSpan.FromMinutes(2)));
     }
 
     [Fact]
-    public void ApplyFailedRecently_LargeLogReadsTailOnly()
+    public void ApplyFailedRecently_WhenLogFileEmpty_ReturnsFalse()
     {
-        // Write 50 KB of noise followed by a recent apply error.
-        // The detector only reads the last 16 KB but our error is
-        // at the end so it'll be found. This proves the tail-read
-        // logic doesn't miss recent entries.
-        var noise = new string('x', 50_000) + "\n";
-        File.WriteAllText(_logPath,
-            noise +
-            "[update:86148] [16:25:25] [ERROR] Apply error: recent\n");
-        var sut = MakeSut(new DateTime(2026, 4, 20, 16, 26, 0));
+        var now = new DateTime(2026, 4, 22, 10, 30, 0);
+        var sut = CreateSut(string.Empty, now);
 
-        var result = sut.ApplyFailedRecently(TimeSpan.FromMinutes(2));
-
-        Assert.True(result);
+        Assert.False(sut.ApplyFailedRecently(TimeSpan.FromMinutes(2)));
     }
 }

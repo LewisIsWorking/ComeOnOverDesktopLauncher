@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.IO;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -78,11 +79,18 @@ public partial class MainWindow : Window
 
     private void ApplyLayout(double width)
     {
+        // Preserve the left panel scroll position across layout changes.
+        // ApplyLayout rebuilds the Grid definitions which resets the
+        // ScrollViewer offset to (0,0) without this save/restore.
+        var scrollOffset = LauncherPanel.Offset;
+
         var usageOnLeft = (DataContext as MainWindowViewModel)?.UsagePanelOnLeft ?? false;
         if (width < BreakpointWidth)
             ApplyVerticalLayout();
         else
             ApplyHorizontalLayout(usageOnLeft);
+
+        LauncherPanel.Offset = scrollOffset;
     }
 
     private void ApplyHorizontalLayout(bool usageOnLeft)
