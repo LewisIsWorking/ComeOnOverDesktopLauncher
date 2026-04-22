@@ -47,9 +47,10 @@ Embeds the Claude usage dashboard directly into the main launcher window as a si
 - NativeWebView embedded directly in MainWindow.axaml as the right column of a two-panel Grid. Navigates to claude.ai/settings/usage on launch.
 - NavigationCompleted redirect: after login claude.ai redirects to the home page; detected and re-navigated to /settings/usage automatically.
 - Auth persistence: EnvironmentRequested handler sets UserDataFolder via reflection (avoids needing the exact WindowsWebView2EnvironmentRequestedEventArgs type name at compile time, keeping the code cross-platform). User logs in once; cookies survive restarts.
-### Responsive layout
+### Responsive layout + scroll preservation
 - MainWindow.axaml.cs ApplyLayout() runs on OnSizeChanged and OnOpened. Width >= 900px: horizontal Grid (440,4,*) with vertical GridSplitter. Width < 900px: vertical Grid (*,4,320) with horizontal GridSplitter.
 - Layout re-applies when UsagePanelOnLeft changes, keeping the orientation consistent.
+- ScrollViewer offset saved before ApplyLayout and restored after so the left panel doesn't jump to the top when the window is resized.
 ### Usage panel position toggle
 - **Checkbox (A)**: "Usage on left" checkbox added to the settings row in LaunchControlsPanel.axaml, binding to MainWindowViewModel.UsagePanelOnLeft. Persisted in AppSettings.
 - **Right-click (B)**: GridSplitter context menu wired in MainWindow.axaml.cs. Opens on right-click; header reads "Move usage panel to left/right" depending on current state. Click triggers ToggleUsagePanelPositionCommand.
@@ -59,6 +60,7 @@ Embeds the Claude usage dashboard directly into the main launcher window as a si
 ### Numbers
 - 263 tests passing. 0 warnings, 0 errors. All files <=200 lines.
 - 1 new package (Avalonia.Controls.WebView 12.0.0). 8 files modified + 1 test file updated.
+
 ## v1.10.6 - Released
 Completes the show/hide-button pair introduced in v1.10.5. Adds a Show button to every TrayCard row so hidden Claude slots can be restored to the foreground directly from the launcher without digging through Claude system-tray menu. Also fixes a latent bug where tray-resident slots were invisible to the resource monitor and were dropped from both collections on the next poll.
 ### New IWindowShower service
@@ -78,58 +80,24 @@ Completes the show/hide-button pair introduced in v1.10.5. Adds a Show button to
 - 263 tests passing. 0 warnings, 0 errors.
 - 2 files added (IWindowShower, Win32WindowShower). 7 files modified + 3 test files updated.
 - All files <=200 lines.
-## v1.10.5 - Released
 
-Adds a Hide button to every slot card so users can close a Claude slot to the system tray without terminating the process. Closes half of the show/hide-button backlog item; the Show-from-tray side remains deferred (requires enumerating hidden top-level windows by PID, which is more complex than Hide).
+## v1.10.5 - Released
+Adds a Hide button to every slot card so users can close a Claude slot to the system tray without terminating the process.
 
 ### New `IWindowHider` service
-
 - `IWindowHider.TryHide(int processId)` - resolves the process's `MainWindowHandle` and calls `ShowWindow(hwnd, SW_HIDE)`. Returns `true` on success, `false` on any failure (process gone, zero hwnd, Win32 call rejected). Never throws.
 - `Win32WindowHider` is the production implementation using `user32.dll` P/Invoke. `SW_HIDE` (not `SW_MINIMIZE`) - minimise leaves the window in the taskbar, hide removes it entirely, matching the user's mental model of "close to tray".
 - Logged on every invocation so diagnostic tail-reads can see whether Hide attempts landed.
 
 ### UI: Hide button on `SlotCard`
-
-- Button sits in the stats row between the uptime display and the existing Kill (X) button. Neutral grey (`#A0A0A0`) foreground so it visually de-emphasises vs Kill's red (`#EF9A9A`) - the non-destructive action is less visually weighted than the destructive one.
-- Tooltip explains the behaviour: "Hide this Claude window to the system tray without terminating it. The slot keeps running (MCP connections stay alive) and will reappear in the 'Hidden / tray' section. Reopen it via Claude's own tray icon."
-- `ClaudeInstanceViewModel.HideCommand` routes through a new `OnHide` callback (same pattern as existing `OnKill` and `OnShowPreview`), wired up by `SlotCallbackBinder` to call `IWindowHider.TryHide`.
-- No refresh prod needed after hide - the next scanner poll (on its own schedule) naturally moves the slot into the TrayCard list via the existing tray-resident classification.
+- Button sits in the stats row between the uptime display and the existing Kill (X) button. Neutral grey (`#A0A0A0`) foreground so it visually de-emphasises vs Kill's red (`#EF9A9A`).
+- `ClaudeInstanceViewModel.HideCommand` routes through a new `OnHide` callback, wired up by `SlotCallbackBinder` to call `IWindowHider.TryHide`.
+- No refresh prod needed after hide - the next scanner poll naturally moves the slot into the TrayCard list.
 
 ### Numbers
-
 - 263 tests passing. 0 warnings, 0 errors.
-- 2 files added (`IWindowHider`, `Win32WindowHider`). 5 files modified (`ClaudeInstanceViewModel`, `SlotInstanceListViewModel`, `SlotCallbackBinder`, `MainWindowViewModel`, `App.axaml.cs`) plus XAML (`SlotCard.axaml`) + test fixture.
-- All files <=200 lines. `MainWindowViewModel.cs` is now at 200 (at the limit) - the next change MUST extract to a new sub-VM.
-- Win32WindowHider itself has no unit tests - all its logic is P/Invoke + error handling that's more meaningfully validated by live smoke-test than by mocking `user32.dll`. The logging is traceable via the existing app log.
-
-### Deferred to v1.10.6+: Show-from-tray
-
-Showing a hidden window requires enumerating all top-level windows (visible and hidden) to find the one belonging to the target PID - `Process.MainWindowHandle` returns `IntPtr.Zero` for hidden windows, so the same simple lookup Hide uses doesn't work. Needs `EnumWindows` + `GetWindowThreadProcessId` + `ShowWindow(SW_SHOW) + SetForegroundWindow`. Users can still re-show a hidden slot via Claude's own system-tray icon in the meantime; the existing tray-resident detection surfaces hidden slots in the launcher's TrayCard list, closing the loop at the UX level even before the Show button lands.
-
-## v1.10.4 - Released
-
-Surfaces the v1.10.2 -> v1.10.3 apply-failure bug to users so the "restart did nothing" symptom stops being silent. Doesn't fix the underlying Velopack/Defender race condition but ends the confusion of clicking Restart and having the banner reappear as if nothing happened.
-
-### New `IUpdateApplyFailureDetector` service
-
-- Reads the tail of `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\velopack.log` on startup (last 16 KB, fast) and scans for `[ERROR] Apply error:` lines with timestamps within a 2-minute window.
-- Never throws - any IO or parse error collapses to `false` (fail closed).
-- Handles midnight rollover - Velopack logs only `HH:MM:SS` with no date; tries "today" first, falls back to "yesterday" if today's timestamp would be in the future.
-- Regex tested against real production data: correctly matches all 8 apply-error entries from Lewis's machine on 2026-04-20.
-
-### New `UpdateUiState.ApplyFailed` state
-
-- `UpdateOrchestrator.MarkApplyFailed()` transitions the state machine directly. Called once at `MainWindowUpdateViewModel` construction if the detector returns true.
-- Distinct from the existing `Failed` state because the UI actions differ: ApplyFailed offers the "Download installer" escape hatch (opens Setup.exe URL in browser); generic Failed just offers Retry.
-- New red banner in `LaunchControlsPanel.axaml` with context-sensitive text: "Update to vX.Y.Z didn't apply. Reboot and try again, or download the installer."
-
-### Tests
-
-8 new tests in `VelopackLogApplyFailureDetectorTests` using real temp files so tail-reading is exercised end-to-end. Cover: no log file, recent error, old error, no apply errors, multiple errors (picks most recent), midnight rollover, IO exception safety, large log (tail-read correctness). Total: 263 tests (was 255).
-
-### Adoption chicken-and-egg
-
-Users currently stuck on v1.10.2/v1.10.3 because their apply keeps failing won't receive v1.10.4 for the same reason. They need to reboot (clears file locks) and retry, or download Setup.exe manually. Once v1.10.4 lands successfully, any future apply failure surfaces the banner immediately. Documented in `docs/dev/LEARNINGS.md`.
+- 2 files added (`IWindowHider`, `Win32WindowHider`). 5 files modified + XAML (`SlotCard.axaml`) + test fixture. All files <=200 lines.
+- Note: Show-from-tray (the counterpart) was completed in v1.10.6.
 
 ## v2.0 - ComeOnOver Integration
 
@@ -152,21 +120,11 @@ Users currently stuck on v1.10.2/v1.10.3 because their apply keeps failing won't
 
 ## Backlog / Under Consideration
 
-- [ ] **Scroll position preservation** - the left launcher panel loses its scroll position when the window is resized (the responsive breakpoint triggers a grid layout rebuild which resets scroll). Fixable by saving ScrollViewer.Offset before and restoring after ApplyLayout().
-- [ ] **Per-instance token/usage display** - surface tokens or session usage % per slot next to CPU/RAM/Up in the slot cards. Three possible data sources: (a) scrape from the embedded usage WebView (fragile, Anthropic can change the DOM), (b) if Anthropic exposes a stable per-session API endpoint, call it per slot, (c) local heuristic from CPU/network activity (rough proxy). No stable API currently known; defer until one appears or the WebView scraping approach is validated.
-- [ ] **Show-from-tray button** (other half of the v1.10.5 Hide feature) - enumerate hidden top-level windows by PID, `ShowWindow(SW_SHOW) + SetForegroundWindow`. Appears on TrayCard rows so hidden slots can be restored without digging through Claude's system-tray menu. Risk: Claude's main-window `Hwnd` can change across hide/show cycles, the scanner may need to re-discover it. Test before shipping.
-
-- [ ] **Investigate Velopack retry-count configuration** - the 10x1s backup-retry window that caused the v1.10.2 -> v1.10.3 failures is hardcoded in Velopack 0.0.1298. Check if `vpk pack` exposes a flag to raise it, or whether newer Velopack versions default to a longer window. Even 30x2s would cover most Defender scan durations. Low-priority because the v1.10.4 banner now gives users a clean escape hatch.
-
-- [ ] **Claude usage tracker + cooldown timer** - surface the data from [claude.ai/settings/usage](https://claude.ai/settings/usage) directly in the launcher so users don't have to alt-tab into the web UI to see their current session %, weekly limits, resets, or extra-usage spend. Also an independently-useful cooldown timer per slot showing how long until the 5-hour rolling window resets. Three implementation paths with tradeoffs:
-    - Embedded WebView (~100 MB install bloat, auth complexity, but simplest to build)
-    - Reverse-engineered internal API (fast/small but fragile, Anthropic can break it)
-    - Local cooldown timer only (zero network dependency, delivers the most-requested piece, pragmatic MVP)
-    Recommendation: start with local-only cooldown timer as MVP, layer on remote usage stats later if a stable API appears. Opt-in via `AppSettings.ShowUsageTracker` default OFF.
-
 - [ ] **Shared extension store across slots** - each `ClaudeSlot{N}\Claude Extensions\` is currently a separate copy of the extension tree. 1.22 GB of duplication measured across ClaudeSlot1-5 on Lewis's machine. Junction points verified working locally. Full design draft with 5 open design questions in [`docs/dev/EXTENSION-STORE.md`](docs/dev/EXTENSION-STORE.md). First step: manually junction one small extension (Filesystem, 12 MB) from slot 2 -> slot 1's copy, verify Claude still loads/uninstalls it cleanly before writing the service layer.
 
-- [ ] **Per-slot activity preview** - surface what each slot is doing at a glance. Open design questions in the existing backlog thinking: thumbnail approach (visual, privacy-mixed), metadata approach (textual, bigger privacy concern), activity-signal approach (CPU %, last-interacted timestamp, minimal privacy exposure). Likely combo: activity signal always visible + optional thumbnail behind a settings toggle OFF by default. Thumbnails stored in-memory only.
+- [ ] **Per-slot activity preview** - surface what each slot is doing at a glance. Likely combo: activity signal (CPU %, last-interacted timestamp) always visible + optional thumbnail behind a settings toggle OFF by default. Thumbnails stored in-memory only.
+
+- [ ] **Per-instance token/usage display** - deferred until Anthropic exposes a stable per-session API. The embedded WebView panel (v1.10.7) already shows global usage at claude.ai/settings/usage. A local-only cooldown timer is not meaningful without knowing when the user's session window actually started.
 
 - [ ] Submit to awesome-avalonia list
 - [ ] Reddit / HN launch post
