@@ -6,6 +6,12 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.11 - Released
+Raises the slot count spinner maximum from 10 to 20. There is no technical upper limit on slot count (the scanner, classifier, and data directories all work for any slot number); the only practical constraint is available RAM (~300-500 MB per Claude instance).
+
+### Numbers
+- 327 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 1 file modified (LaunchControlsPanel.axaml).
 ## v1.10.10 - Released
 Adds a per-slot activity signal to each slot card — "Active now", "Active Xm ago", or "Idle" — derived from when the slot's CPU last crossed 3%. Also closes the per-slot activity preview backlog item: thumbnails were already shipped in v1.9.x; this adds the missing activity timestamp signal. Also ticks off the "Submit to awesome-avalonia" backlog item.
 

@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ComeOnOverDesktopLauncher.ViewModels"
              x:Class="ComeOnOverDesktopLauncher.Views.Controls.LaunchControlsPanel"
@@ -14,7 +14,7 @@
         <StackPanel Spacing="8" IsVisible="{Binding IsClaudeInstalled}">
             <TextBlock Text="Additional instances to open:" FontSize="13"/>
             <NumericUpDown Value="{Binding SlotCount}"
-                           Minimum="1" Maximum="10"
+                           Minimum="1" Maximum="20"
                            FormatString="0"
                            Width="120"
                            HorizontalAlignment="Left"/>
