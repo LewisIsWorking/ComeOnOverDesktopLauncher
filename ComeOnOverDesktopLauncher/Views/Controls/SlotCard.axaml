@@ -23,10 +23,7 @@
 
             <!-- Thumbnail: 240x150 target, fit preserving aspect.
                  Click/tap opens the lightbox preview window. The hand
-                 cursor + tooltip make the interaction discoverable;
-                 the Tapped handler routes through the VM's
-                 ShowPreviewCommand so keyboard invocation would work
-                 the same way if we wire it later. -->
+                 cursor + tooltip make the interaction discoverable. -->
             <Border Height="150"
                     Background="#0D0D0D"
                     BorderBrush="#222"
@@ -68,13 +65,7 @@
                      Padding="0,2"
                      PlaceholderText="Name this slot..."/>
 
-            <!-- Stats row: CPU, RAM, Uptime, Hide, Kill.
-                 Hide (v1.10.5+) closes the window to the system tray
-                 WITHOUT killing the process - the slot will reappear
-                 in the "Hidden / tray" section on next scanner poll.
-                 Kill terminates the process entirely. Hide is styled
-                 neutral (grey) vs Kill (red) so users don't confuse
-                 the non-destructive action with the destructive one. -->
+            <!-- Stats row: CPU, RAM, Uptime, Hide, Kill. -->
             <Grid ColumnDefinitions="*,*,*,Auto,Auto">
                 <StackPanel Grid.Column="0" HorizontalAlignment="Center">
                     <TextBlock Text="CPU" FontSize="9" Foreground="Gray"
@@ -114,6 +105,15 @@
                         Padding="8,2"
                         ToolTip.Tip="Close this Claude instance"/>
             </Grid>
+
+            <!-- Activity signal: last time this slot's CPU cleared the
+                 activity threshold (3%). Updated every poll tick.
+                 Shows "Idle" until the first spike is observed. -->
+            <TextBlock Text="{Binding LastActiveDisplay}"
+                       FontSize="9"
+                       Foreground="#555"
+                       HorizontalAlignment="Center"
+                       ToolTip.Tip="Last time this slot was actively processing (CPU above 3%). Updated every poll tick."/>
 
         </StackPanel>
     </Border>

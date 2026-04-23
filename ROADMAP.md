@@ -6,6 +6,21 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.10 - Released
+Adds a per-slot activity signal to each slot card — "Active now", "Active Xm ago", or "Idle" — derived from when the slot's CPU last crossed 3%. Also closes the per-slot activity preview backlog item: thumbnails were already shipped in v1.9.x; this adds the missing activity timestamp signal. Also ticks off the "Submit to awesome-avalonia" backlog item.
+
+### Per-slot activity signal
+- ClaudeInstanceViewModel.LastActiveDisplay — computed string property updated on every UpdateFrom call. Stamps _lastActiveAt = DateTime.UtcNow when CpuPercent >= 3.0. Format: "Idle" (never spiked), "Active now" (<30s), "Active Xm ago" (<1h), "Active Xh Xm ago" (≥1h).
+- SlotCard.axaml — small grey TextBlock below the stats row bound to LastActiveDisplay, with tooltip explaining the 3% threshold.
+- 6 new tests in ClaudeInstanceViewModelActivityTests: never-active→Idle, high-CPU→Active now, low-CPU→Idle, exact-threshold→Active, spike-then-idle retains timestamp, just-below-threshold→Idle.
+
+### Backlog closures
+- **Per-slot activity preview** — closed as shipped. Thumbnails landed in v1.9.x; last-active timestamp lands here.
+- **Submit to awesome-avalonia** — PR opened to AvaloniaCommunity/awesome-avalonia adding ComeOnOver Desktop Launcher to the Open Source Applications section.
+
+### Numbers
+- 327 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 1 file added (ClaudeInstanceViewModelActivityTests). 2 files modified (ClaudeInstanceViewModel, SlotCard.axaml).
 ## v1.10.9 - Released
 Per-slot RAM and CPU totals now match Windows Task Manager by aggregating the full Electron process tree (renderer, GPU, crashpad, network service, node-service) into each slot card. Also ships a large test health pass: 57 new tests across 7 new files, covering tree analysis, child-snapshot aggregation, resource monitor CPU delta, thumbnail refresher, slot callback binder, update orchestrator, and banner text formatting.
 
@@ -122,9 +137,9 @@ Adds a Hide button to every slot card so users can close a Claude slot to the sy
 
 - [x] **Shared extension store across slots** - CLOSED: junction/symlink approach is not feasible. Windows blocks directory enumeration (FindFirstFileW) on reparse points whose source is inside `%LOCALAPPDATA%` (non-Temp), regardless of ACLs, reparse tag type, or `\\?\` prefix. Since `ClaudeSlot{N}\Claude Extensions\` is always inside `%LOCALAPPDATA%`, Claude's Node.js process cannot enumerate through any junction placed there. Investigated empirically 2026-04-22 - confirmed on Lewis's machine. See `docs/dev/LEARNINGS.md` for full findings. The 1.22 GB duplication remains; a future copy-on-install propagation approach (install in one slot → offer to copy to others) is a different feature with different tradeoffs and could be added as a new backlog item.
 
-- [ ] **Per-slot activity preview** - surface what each slot is doing at a glance. Likely combo: activity signal (CPU %, last-interacted timestamp) always visible + optional thumbnail behind a settings toggle OFF by default. Thumbnails stored in-memory only.
+- [x] **Per-slot activity preview** - Shipped in v1.10.10. Thumbnails: v1.9.x. Last-active timestamp: v1.10.10.
 
 - [ ] **Per-instance token/usage display** - deferred until Anthropic exposes a stable per-session API. The embedded WebView panel (v1.10.7) already shows global usage at claude.ai/settings/usage. A local-only cooldown timer is not meaningful without knowing when the user's session window actually started.
 
-- [ ] Submit to awesome-avalonia list
+- [x] Submit to awesome-avalonia list - PR opened to AvaloniaCommunity/awesome-avalonia.
 - [ ] Reddit / HN launch post

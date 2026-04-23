@@ -1,4 +1,4 @@
-﻿using Avalonia.Media;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -8,26 +8,36 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Wraps a single Claude instance's live resource stats and user-defined name.
-/// Exposes a Kill command so users can fully close an instance rather than letting
-/// Claude minimize it to the system tray.
+/// Exposes Kill/Hide/Show commands so the user can manage the window without
+/// touching the Claude tray icon.
 ///
 /// <para>
-/// <see cref="Thumbnail"/> holds the most recent PNG snapshot of the
-/// instance's window as an Avalonia <see cref="Bitmap"/>, refreshed by
-/// <see cref="MainWindowViewModel.RefreshResources"/> on every poll
-/// tick via <see cref="UpdateThumbnailFromBytes"/>. Passing null bytes
-/// is a no-op by design so close-to-tray'd slots retain their last
-/// captured frame (the "frozen thumbnail" behaviour). Callers that
-/// genuinely want to blank the thumbnail use <see cref="ClearThumbnail"/>.
+/// <see cref="Thumbnail"/> holds the most recent PNG snapshot of the instance's
+/// window, refreshed on every poll tick via <see cref="UpdateThumbnailFromBytes"/>.
+/// Null bytes are a no-op so tray-resident slots keep their last frame.
+/// </para>
+///
+/// <para>
+/// <see cref="LastActiveDisplay"/> shows the last time the slot's CPU exceeded
+/// <see cref="CpuActivityThreshold"/> percent, updated every poll tick.
+/// "Idle" until the first spike is observed.
 /// </para>
 /// </summary>
 public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableViewModel
 {
+    /// <summary>CPU % floor that counts as "active". Electron idle
+    /// baseline is ~0-1%; sustained UI work sits above 3%.</summary>
+    private const double CpuActivityThreshold = 3.0;
+
     private readonly Action<int, string>? _onNameChanged;
     private readonly Action<int>? _onKill;
     private readonly Action<int>? _onHide;
     private readonly Action<int>? _onShow;
     private readonly Action<ClaudeInstanceViewModel>? _onShowPreview;
+
+    /// <summary>UTC timestamp of the last poll tick where CPU exceeded
+    /// <see cref="CpuActivityThreshold"/>. Null until the first spike.</summary>
+    private DateTime? _lastActiveAt;
 
     [ObservableProperty] private int _instanceNumber;
     [ObservableProperty] private int _processId;
@@ -45,24 +55,13 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
 
     public string LoginStatusText => IsSeeded ? "Logged in" : "Not logged in";
 
-    /// <summary>
-    /// Pill background as an <see cref="IBrush"/> so XAML can bind
-    /// directly to a <c>Border.Background</c> without relying on the
-    /// legacy string-to-<c>Color</c> coercion that stopped working
-    /// cleanly inside compiled-binding UserControl data templates in
-    /// v1.9.1 (the pill was rendering transparent in the new card
-    /// layout). <see cref="SolidColorBrush"/> is frozen at
-    /// construction and safe to keep as a singleton per instance.
-    /// </summary>
+    /// <summary>Pill background bound directly as an <see cref="IBrush"/>
+    /// to avoid the string→Color coercion that broke compiled bindings
+    /// in v1.9.1.</summary>
     public IBrush LoginStatusBackground => IsSeeded
         ? new SolidColorBrush(Color.Parse("#2E7D32"))
         : new SolidColorBrush(Color.Parse("#5D2F2F"));
 
-    /// <summary>
-    /// Pill foreground as an <see cref="IBrush"/>. Same rationale as
-    /// <see cref="LoginStatusBackground"/> - bind as
-    /// <c>TextBlock.Foreground</c> directly, no coercion needed.
-    /// </summary>
     public IBrush LoginStatusForeground => IsSeeded
         ? new SolidColorBrush(Color.Parse("#81C784"))
         : new SolidColorBrush(Color.Parse("#EF9A9A"));
@@ -70,6 +69,25 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
     public string LoginStatusTooltip => IsSeeded
         ? "Logged in"
         : "Not yet logged in - will log in on first launch";
+
+    /// <summary>
+    /// Human-readable activity signal derived from the last time this
+    /// slot's CPU exceeded <see cref="CpuActivityThreshold"/> percent.
+    /// Updated on every <see cref="UpdateFrom"/> call regardless of
+    /// whether the threshold was crossed, so the elapsed time keeps
+    /// advancing even during idle periods.
+    /// </summary>
+    public string LastActiveDisplay
+    {
+        get
+        {
+            if (_lastActiveAt is null) return "Idle";
+            var age = DateTime.UtcNow - _lastActiveAt.Value;
+            if (age.TotalSeconds < 30) return "Active now";
+            if (age.TotalHours < 1) return $"Active {(int)age.TotalMinutes}m ago";
+            return $"Active {(int)age.TotalHours}h {age.Minutes}m ago";
+        }
+    }
 
     public ClaudeInstanceViewModel(
         int instanceNumber,
@@ -91,71 +109,43 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         _onShowPreview = onShowPreview;
     }
 
-    partial void OnSlotNameChanged(string value)
-    {
+    partial void OnSlotNameChanged(string value) =>
         _onNameChanged?.Invoke(InstanceNumber, value);
-    }
 
     [RelayCommand]
-    private void Kill()
-    {
-        _onKill?.Invoke(ProcessId);
-    }
+    private void Kill() => _onKill?.Invoke(ProcessId);
 
-    /// <summary>
-    /// Hides this slot's Claude window to the system tray without
-    /// terminating it. v1.10.5+; routes through a callback supplied
-    /// by the list VM so per-row VMs stay service-free (matches the
-    /// Kill and ShowPreview patterns). On the next scanner poll the
-    /// slot will move from the SlotCard list into the TrayCard list
-    /// automatically - no coordination needed here.
-    /// </summary>
+    /// <summary>Hides window to tray without terminating. v1.10.5+.</summary>
     [RelayCommand]
-    private void Hide()
-    {
-        _onHide?.Invoke(ProcessId);
-    }
+    private void Hide() => _onHide?.Invoke(ProcessId);
+
+    /// <summary>Restores window from tray to foreground. v1.10.6+.</summary>
+    [RelayCommand]
+    private void Show() => _onShow?.Invoke(ProcessId);
+
+    /// <summary>Opens lightbox preview for current thumbnail.</summary>
+    [RelayCommand]
+    private void ShowPreview() => _onShowPreview?.Invoke(this);
 
     /// <summary>
-    /// Restores this slot's Claude window from the system tray to the
-    /// foreground. v1.10.6+; routes through a callback supplied by the
-    /// list VM so per-row VMs stay service-free (matches the Kill and
-    /// Hide patterns). On the next scanner poll the slot will move from
-    /// the TrayCard list into the SlotCard list automatically.
+    /// Refreshes live resource fields from the latest poll snapshot.
+    /// Stamps <see cref="_lastActiveAt"/> when CPU clears the threshold
+    /// and always raises <see cref="LastActiveDisplay"/> so the elapsed
+    /// time string advances each tick.
     /// </summary>
-    [RelayCommand]
-    private void Show()
-    {
-        _onShow?.Invoke(ProcessId);
-    }
-    /// <summary>
-    /// Opens the lightbox-style preview window for this slot's
-    /// current <see cref="Thumbnail"/>. No-op if the callback isn't
-    /// wired or the thumbnail hasn't been captured yet; the preview
-    /// service also guards against a null bitmap at its own layer.
-    /// </summary>
-    [RelayCommand]
-    private void ShowPreview()
-    {
-        _onShowPreview?.Invoke(this);
-    }
-
     public void UpdateFrom(InstanceResourceSnapshot snapshot)
     {
         ProcessId = snapshot.ProcessId;
         CpuPercent = snapshot.CpuPercent;
         RamMb = snapshot.RamMb;
         UptimeDisplay = snapshot.UptimeDisplay;
+        if (snapshot.CpuPercent >= CpuActivityThreshold)
+            _lastActiveAt = DateTime.UtcNow;
+        OnPropertyChanged(nameof(LastActiveDisplay));
     }
 
-    /// <summary>
-    /// Replaces <see cref="Thumbnail"/> with a new <c>Bitmap</c> decoded
-    /// from the supplied PNG bytes. A null or empty array is a no-op,
-    /// not a clear - tray-resident slots rely on this to keep their
-    /// last captured frame visible after the window goes away. The
-    /// previous bitmap (if any) is disposed to release its unmanaged
-    /// buffer.
-    /// </summary>
+    /// <summary>Replaces thumbnail from PNG bytes. Null/empty is a no-op
+    /// (keeps last frame for tray-resident slots). Disposes the old bitmap.</summary>
     public void UpdateThumbnailFromBytes(byte[]? pngBytes)
     {
         if (pngBytes is null || pngBytes.Length == 0) return;
@@ -165,12 +155,8 @@ public partial class ClaudeInstanceViewModel : ObservableObject, IThumbnailableV
         old?.Dispose();
     }
 
-    /// <summary>
-    /// Explicitly blanks the thumbnail and disposes its unmanaged
-    /// buffer. Called when the user toggles the "Show thumbnails"
-    /// setting off, or when a row is about to be removed from the
-    /// collection entirely.
-    /// </summary>
+    /// <summary>Blanks the thumbnail and disposes its buffer. Called when
+    /// thumbnails are toggled off or the row is removed.</summary>
     public void ClearThumbnail()
     {
         var old = Thumbnail;
