@@ -1,62 +1,88 @@
 # ComeOnOver Desktop Launcher
 
-A launcher utility for the [ComeOnOver](https://comeonover.netlify.app) ecosystem.
+Run multiple isolated Claude AI instances side by side on Windows. Each slot has its own login session, extensions, and MCP connections — switch between work, personal, and research contexts without losing state.
 
-![ComeOnOver Desktop Launcher](docs/screenshots/photo_2026-04-15_16-13-35.jpg)
+![ComeOnOver Desktop Launcher](docs/screenshots/1.10.11.jpg)
 
 ## Features
 
-- Launch one or more Claude Desktop instances simultaneously
-- Each instance uses a fixed named slot, preserving your login session between launches
-- Name each instance (e.g. "Work", "Personal", "Research") - names persist between sessions
-- Live CPU, RAM and uptime monitoring per instance and combined totals - auto-refreshes every 5 seconds
-- Live thumbnail previews of each Claude window; click a thumbnail to enlarge
-- Open the ComeOnOver web app directly from the launcher
-- Minimises to system tray - always one click away
-- Auto-updates in the background - opt-out toggle if you prefer to manage updates manually
+### Multiple isolated Claude slots
+- Launch up to 100 Claude Desktop instances simultaneously (configurable)
+- Each slot uses a dedicated user-data directory (`ClaudeSlot1`, `ClaudeSlot2`, ...) — logins, cookies, extensions, and MCP connections are fully separate
+- Name each slot (e.g. "Work", "Personal", "Research") — names persist between sessions
+- Hide a slot to the system tray without terminating it (MCP connections stay alive); restore it with the Show button
+
+### Live resource monitoring
+- Per-slot CPU %, RAM, and uptime updated every poll tick
+- RAM and CPU totals match Windows Task Manager — the full Electron process tree (renderer, GPU, crashpad, network service) is aggregated per slot
+- Per-slot activity signal: "Active now" / "Active Xm ago" / "Idle" based on CPU threshold
+- Combined totals row: running instance count, total RAM, total CPU
+
+### Thumbnails & preview
+- Live window thumbnails captured per slot on every poll tick
+- Click any thumbnail to open a full-size lightbox preview
+- Toggle thumbnails off via the "Show thumbnails" checkbox if you prefer a minimal view
+
+### Embedded usage dashboard
+- Claude's usage page (`claude.ai/settings/usage`) embedded inline as a resizable side panel
+- Drag the splitter to resize; right-click the splitter or use the "Usage on left" checkbox to swap sides
+- Auth persists across restarts — log in once
+
+### Auto-update
+- Updates download and install automatically in the background via [Velopack](https://velopack.io)
+- "Restart to install" prompt appears when a new version is ready, on your schedule
+- Opt-out toggle in the settings bar
+- Apply-failure detection: if an update fails to apply (e.g. Defender file lock), a banner tells you instead of silently reverting
 
 ## Requirements
 
 - Windows 10/11
 - [Claude Desktop](https://claude.ai/download) installed via the Microsoft Store
-- No .NET installation required - the installer bundles everything
+- No .NET installation required — the installer bundles everything
 
 ## Install
 
-Head to [Releases](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/releases) and download the latest `ComeOnOverDesktopLauncher-win-Setup.exe`. Run it to install.
+Download the latest `ComeOnOverDesktopLauncher-win-Setup.exe` from [Releases](https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher/releases) and run it.
 
-The installer puts the launcher in `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\` (no UAC prompt needed) and creates both a Desktop shortcut and a Start Menu entry. Future updates download and install automatically in the background - you'll see a "Restart to install" prompt when a new version is ready, on your schedule.
+The installer puts the launcher in `%LOCALAPPDATA%\ComeOnOverDesktopLauncher\` (no UAC prompt) and creates a Desktop shortcut and Start Menu entry.
 
-**First-install SmartScreen warning.** Because the installer isn't code-signed, Windows will show a blue "Windows protected your PC" dialog the first time you run it. Click **More info**, then **Run anyway**. This is a one-time thing; subsequent auto-updates don't re-trigger SmartScreen. Code signing is on the roadmap.
+**SmartScreen warning.** Because the installer isn't code-signed yet, Windows shows a "Windows protected your PC" dialog on first run. Click **More info → Run anyway**. This is a one-time prompt; subsequent auto-updates don't re-trigger it. Code signing is on the roadmap.
 
-**Upgrading from v1.9.x or earlier?** See [`docs/MIGRATION.md`](docs/MIGRATION.md) for a one-time migration from the old portable `.exe` to the new installer-based distribution.
+**Portable install.** Each release also ships `ComeOnOverDesktopLauncher-win-Portable.zip` — extract and run directly. The portable version does not auto-update.
 
-If you'd prefer a portable install, each release also ships a `ComeOnOverDesktopLauncher-win-Portable.zip` - extract and run `ComeOnOverDesktopLauncher.exe` directly. The portable version does not auto-update.
+**Upgrading from v1.9.x or earlier?** See [`docs/MIGRATION.md`](docs/MIGRATION.md) for a one-time migration from the old portable `.exe` to the installer-based distribution.
 
-## Getting Started (from source)
-
-1. Clone the repository
-2. Open `ComeOnOverDesktopLauncher.sln` in Rider or Visual Studio
-3. Build and run `ComeOnOverDesktopLauncher`
-
-## Project Structure
+## Getting started (from source)
 
 ```
-ComeOnOverDesktopLauncher/          # Avalonia UI (views, viewmodels, DI setup)
-ComeOnOverDesktopLauncher.Core/     # Business logic (models, services, interfaces)
-ComeOnOverDesktopLauncher.Tests/    # xUnit test suite (100% coverage)
+git clone https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher
 ```
 
-## Development
+Open `ComeOnOverDesktopLauncher.sln` in Rider or Visual Studio, then build and run `ComeOnOverDesktopLauncher`.
 
-> **Contributing / LLM-assisted development:** read [`docs/dev/LEARNINGS.md`](docs/dev/LEARNINGS.md) first. It is the accumulated list of gotchas, hard rules, release checklist, and architectural invariants for this repo. Written for future sessions of Claude but useful for any contributor.
+## Project structure
 
+```
+ComeOnOverDesktopLauncher/          # Avalonia UI — views, view models, DI wiring
+ComeOnOverDesktopLauncher.Core/     # Business logic — models, services, interfaces
+ComeOnOverDesktopLauncher.Tests/    # xUnit test suite
+```
+
+## Tech stack
 
 - .NET 10, Avalonia 12, CommunityToolkit.Mvvm
-- SOLID principles, MVVM pattern throughout
-- 200-line file limit - extract to new files rather than growing existing ones
-- 100% unit test coverage required on all commits
+- Velopack for auto-update and installation
+- WMI for process tree scanning
+- Win32 P/Invoke for window hide/show, thumbnail capture, icon cache refresh
+
+## Development notes
+
+See [`docs/dev/LEARNINGS.md`](docs/dev/LEARNINGS.md) for the accumulated architectural invariants, hard rules, release checklist, and gotchas for this codebase. Written to be useful to any contributor (human or LLM).
+
+- 200-line file limit on all source files — extract via OOP rather than trimming
+- 100% test pass rate required before every push (enforced by a pre-push git hook)
+- SOLID / MVVM / event-driven throughout; ViewModels never touch system APIs directly
 
 ## Roadmap
 
-See [ROADMAP.md](ROADMAP.md) for planned features and release milestones.
+See [ROADMAP.md](ROADMAP.md).
