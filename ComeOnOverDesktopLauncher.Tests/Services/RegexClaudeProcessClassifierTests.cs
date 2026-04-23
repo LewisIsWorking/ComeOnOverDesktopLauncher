@@ -13,7 +13,7 @@ public class RegexClaudeProcessClassifierTests
     [Fact]
     public void TryClassifyAsSlot_WithQuotedSlotPath_ReturnsSlotInfo()
     {
-        var info = Claude(@"""C:\Program Files\WindowsApps\Claude\app\claude.exe"" --user-data-dir=""C:\Users\Lewis\AppData\Local\ClaudeSlot3""");
+        var info = Claude(@"""C:\Program Files\WindowsApps\Claude\app\claude.exe"" --user-data-dir=""C:\\Users\\TestUser\\AppData\\Local\\ClaudeSlot3""");
 
         var result = _sut.TryClassifyAsSlot(info);
 
@@ -25,7 +25,7 @@ public class RegexClaudeProcessClassifierTests
     [Fact]
     public void TryClassifyAsSlot_WithUnquotedSlotPath_ReturnsSlotInfo()
     {
-        var info = Claude(@"C:\claude.exe --user-data-dir=C:\Users\Lewis\AppData\Local\ClaudeSlot7");
+        var info = Claude(@"C:\claude.exe --user-data-dir=C:\\Users\\TestUser\\AppData\\Local\\ClaudeSlot7");
 
         Assert.Equal(7, _sut.TryClassifyAsSlot(info)?.SlotNumber);
     }

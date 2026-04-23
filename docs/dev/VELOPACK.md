@@ -133,17 +133,17 @@ $s.Save()
 
 **v1.10.2 update: option (b) shipped.** `IShortcutHealer` runs on every startup; if the Velopack install's Start Menu .lnk is missing it is recreated via the same `WScript.Shell` COM API Velopack itself uses. Dev-build guard skips the heal on `dotnet run`. Six unit tests cover every branch. Upstream issue still worth filing but users no longer hit the bug regardless of Velopack fix timeline.
 
-**v1.10.3 update: icon cache refresh added.** Observed on Lewis's machine after v1.10.2 shipped: even after a successful heal, Windows' icon cache kept showing the generic document icon for the new shortcut until `explorer.exe` was manually restarted or the cache expired naturally. v1.10.3 adds an `IIconCacheRefresher` service invoked only on the `HealedMissing` branch. Calls `ie4uinit.exe -show`, Microsoft's documented icon-cache refresh utility (lighter than killing explorer.exe). Never fires on `AlreadyPresent` or `SkippedDevBuild` - those paths don't write anything new to disk.
+**v1.10.3 update: icon cache refresh added.** Observed on the developer machine after v1.10.2 shipped: even after a successful heal, Windows' icon cache kept showing the generic document icon for the new shortcut until `explorer.exe` was manually restarted or the cache expired naturally. v1.10.3 adds an `IIconCacheRefresher` service invoked only on the `HealedMissing` branch. Calls `ie4uinit.exe -show`, Microsoft's documented icon-cache refresh utility (lighter than killing explorer.exe). Never fires on `AlreadyPresent` or `SkippedDevBuild` - those paths don't write anything new to disk.
 
 ### Watch out: MSIX-sandboxed PowerShell resolves `$env:LOCALAPPDATA` to a virtualized path
 
 Learned while investigating the Start Menu shortcut bug above. When running PowerShell from inside an MSIX-sandboxed process (e.g. Claude Desktop's terminal), `$env:LOCALAPPDATA` resolves to the sandbox's redirected path:
 
 ```
-$env:LOCALAPPDATA = C:\Users\Lewis\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local
+$env:LOCALAPPDATA = %LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Local
 ```
 
-not the real `C:\Users\Lewis\AppData\Local`. If you construct paths from `$env:LOCALAPPDATA` (e.g. when manually rebuilding a shortcut), the resulting paths will be **virtualized paths that don't exist outside the sandbox**. Windows Shell won't be able to resolve them, the target won't be found, icons won't load.
+not the real `%LOCALAPPDATA%`. If you construct paths from `$env:LOCALAPPDATA` (e.g. when manually rebuilding a shortcut), the resulting paths will be **virtualized paths that don't exist outside the sandbox**. Windows Shell won't be able to resolve them, the target won't be found, icons won't load.
 
 Fix: construct paths from `$env:USERPROFILE` instead (`$env:USERPROFILE\AppData\Local\...`). `USERPROFILE` is not virtualized by the MSIX sandbox.
 

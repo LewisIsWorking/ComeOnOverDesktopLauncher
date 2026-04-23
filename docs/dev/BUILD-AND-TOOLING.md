@@ -19,7 +19,7 @@ The hook is not auto-installed by git on clone ÔÇö it lives in `docs/dev/hook
 Run this any time you suspect drift. It's also what the CI guard (`FileSizeLimitTests`) checks:
 
 ```powershell
-$root = "C:\Users\Lewis\RiderProjects\ComeOnOverDesktopLauncher"
+$root = "$env:USERPROFILE\RiderProjects\ComeOnOverDesktopLauncher"
 Get-ChildItem -Path $root -Recurse -File -Include *.cs, *.axaml, *.md |
     Where-Object { $_.FullName -notmatch "\\(bin|obj|TestResults|\.git|node_modules)\\" } |
     ForEach-Object {

@@ -43,7 +43,7 @@ These come from the project owner and are non-negotiable:
 Investigated 2026-04-22 during the shared extension store design. **Do not re-investigate — this is a confirmed Windows OS restriction, not a bug we can fix.**
 
 - `GetFileSystemEntries` (`FindFirstFileW`) and `GetChildItem` on a junction or directory symlink located inside `%LOCALAPPDATA%` (but outside `%LOCALAPPDATA%\Temp`) always fail with "Could not find a part of the path", even though `Test-Path` and `GetFileAttributesW` succeed on the same path.
-- Confirmed on Lewis's machine (Windows 11, Developer Mode ON). Not caused by: AppContainer SIDs, spaces in path names, `\\?\` extended prefix, or junction vs symlink reparse tag. A junction FROM `Documents` or `AppData\Roaming` TO `AppData\Local` works fine — the restriction is specifically on junctions whose SOURCE is inside `AppData\Local` (non-Temp).
+- Confirmed on the developer machine (Windows 11, Developer Mode ON). Not caused by: AppContainer SIDs, spaces in path names, `\\?\` extended prefix, or junction vs symlink reparse tag. A junction FROM `Documents` or `AppData\Roaming` TO `AppData\Local` works fine — the restriction is specifically on junctions whose SOURCE is inside `AppData\Local` (non-Temp).
 - **Consequence for extension store**: `ClaudeSlot{N}\Claude Extensions\` is always inside `AppData\Local`, so any junction/symlink placed there to redirect to a shared store will be unreadable by Claude's Node.js process (which uses the same Win32 `FindFirstFileW` API). The entire junction-based extension deduplication approach is blocked.
 - The backlog item "Shared extension store" has been closed as not feasible via junctions/symlinks. See ROADMAP for the updated note.
 
@@ -64,5 +64,5 @@ Added in v1.10.7. Package: `Avalonia.Controls.WebView 12.0.0`. `NativeWebView` i
 - Seed cache is at `%APPDATA%\ComeOnOverDesktopLauncher\seed\`.
 - Logs are at `%APPDATA%\ComeOnOverDesktopLauncher\logs\launcher-YYYY-MM-DD.log`.
 - User's Windows GitHub Desktop is the shiftkey fork v3.4.12-linux1.
-- AutoHotkey v2 script at `C:\Users\Lewis\Documents\AutoHotkey\Continue.ahk`.
+- AutoHotkey v2 script at `%USERPROFILE%\Documents\AutoHotkey\Continue.ahk`.
 - The user has a multi-monitor setup. Primary monitor is 2560x1440. Prefer `Windows-MCP:Click` tool for automated clicks (handles DPI correctly).
