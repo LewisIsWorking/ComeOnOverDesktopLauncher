@@ -6,6 +6,12 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.12 - Released
+Raises the slot count spinner maximum from 20 to 100. No technical upper limit exists on slot count; the only practical constraint is available RAM.
+
+### Numbers
+- 327 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 1 file modified (LaunchControlsPanel.axaml).
 ## v1.10.11 - Released
 Raises the slot count spinner maximum from 10 to 20. There is no technical upper limit on slot count (the scanner, classifier, and data directories all work for any slot number); the only practical constraint is available RAM (~300-500 MB per Claude instance).
 
