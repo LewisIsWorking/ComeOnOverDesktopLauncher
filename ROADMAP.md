@@ -153,5 +153,5 @@ Adds a Hide button to every slot card so users can close a Claude slot to the sy
 
 - [ ] **Per-instance token/usage display** - deferred until Anthropic exposes a stable per-session API. The embedded WebView panel (v1.10.7) already shows global usage at claude.ai/settings/usage. A local-only cooldown timer is not meaningful without knowing when the user's session window actually started.
 
-- [x] Submit to awesome-avalonia list - PR opened to AvaloniaCommunity/awesome-avalonia.
+- [x] Submit to awesome-avalonia list - Merged into AvaloniaCommunity/awesome-avalonia (PR #265, 2026-04-24). Listed under the Artificial Intelligence section.
 - [ ] Reddit / HN launch post
