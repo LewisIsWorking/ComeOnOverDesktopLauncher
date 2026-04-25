@@ -9,18 +9,8 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 
 /// <summary>
 /// Sub-VM for the v1.10.0+ Velopack-driven auto-update UI. Owns the
-/// <see cref="UpdateOrchestrator"/>, exposes observable state to the
-/// update banner in <c>LaunchControlsPanel</c>, and hosts the three
-/// user-driven update commands. Extracted from
-/// <see cref="MainWindowViewModel"/> so the root VM stays under the
-/// 200-line limit; same split pattern as <c>SlotInstanceListViewModel</c>
-/// and <c>ExternalInstanceListViewModel</c>.
-///
-/// <para>
-/// Bound in XAML via <c>Update.IsReadyToInstall</c>,
-/// <c>Update.DownloadingBannerText</c>, <c>Update.RestartCommand</c>,
-/// etc. The root VM exposes this as a non-nullable <c>Update</c> property.
-/// </para>
+/// UpdateOrchestrator, exposes observable state to the update banner
+/// in LaunchControlsPanel, and hosts the user-driven update commands.
 /// </summary>
 public partial class MainWindowUpdateViewModel : ObservableObject
 {
@@ -40,6 +30,11 @@ public partial class MainWindowUpdateViewModel : ObservableObject
     public bool IsReadyToInstall => State == UpdateUiState.ReadyToInstall;
     public bool IsFailed => State == UpdateUiState.Failed;
     public bool IsApplyFailed => State == UpdateUiState.ApplyFailed;
+
+    /// <summary>True when no update activity is in progress. Drives
+    /// the visibility of the manual "Check for updates" button.</summary>
+    public bool IsIdle => State == UpdateUiState.Idle;
+
     public string ReadyBannerText => LatestVersion is null
         ? "Update ready - restart to install"
         : $"v{LatestVersion} ready - restart to install";
@@ -72,11 +67,6 @@ public partial class MainWindowUpdateViewModel : ObservableObject
             onProgressChanged: p => Dispatcher.UIThread.Post(() => DownloadProgress = p),
             onLatestVersionChanged: v => Dispatcher.UIThread.Post(() => LatestVersion = v));
 
-        // v1.10.4+: check on construction for a recent Velopack apply
-        // failure. 2-minute window covers the typical 15-second apply
-        // attempt plus launcher startup lag. If detected, jump
-        // straight into ApplyFailed state so the user sees the
-        // recovery banner before any other update-check activity.
         if (applyFailureDetector.ApplyFailedRecently(TimeSpan.FromMinutes(2)))
             _orchestrator.MarkApplyFailed();
 
@@ -99,6 +89,7 @@ public partial class MainWindowUpdateViewModel : ObservableObject
         OnPropertyChanged(nameof(IsReadyToInstall));
         OnPropertyChanged(nameof(IsFailed));
         OnPropertyChanged(nameof(IsApplyFailed));
+        OnPropertyChanged(nameof(IsIdle));
     }
 
     partial void OnLatestVersionChanged(string? value)
@@ -129,4 +120,11 @@ public partial class MainWindowUpdateViewModel : ObservableObject
     [RelayCommand]
     private void DownloadInstaller() =>
         _processService.Start(DownloadInstallerUrl, string.Empty, useShellExecute: true);
+
+    /// <summary>Manual update check - always runs regardless of
+    /// AutoCheckEnabled. Wired to the "Check for updates" button
+    /// visible in the idle state.</summary>
+    [RelayCommand]
+    private async Task CheckForUpdates() =>
+        await _orchestrator.RunCheckAsync(autoCheckEnabled: true);
 }

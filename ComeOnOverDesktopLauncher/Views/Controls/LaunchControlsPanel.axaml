@@ -77,6 +77,15 @@
              stays flat rather than nesting Converter logic. Matches
              v1.10.0 UX spec: silent download, prompt to restart. -->
         <StackPanel Spacing="4">
+            <!-- Idle: subtle check-for-updates button. Only visible when no
+                 update activity is in progress. -->
+            <Button Content="Check for updates"
+                    Command="{Binding Update.CheckForUpdatesCommand}"
+                    IsVisible="{Binding Update.IsIdle}"
+                    FontSize="11"
+                    Padding="8,2"
+                    HorizontalAlignment="Left"
+                    ToolTip.Tip="Manually check GitHub for a newer version of the launcher."/>
             <!-- Downloading: blue banner + progress bar -->
             <Border Background="#1A2196F3" CornerRadius="4" Padding="10,6"
                     IsVisible="{Binding Update.IsDownloading}">

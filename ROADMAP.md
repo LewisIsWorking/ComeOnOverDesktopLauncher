@@ -6,6 +6,17 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.15 - Released
+Adds a manual "Check for updates" button visible in the launcher when no update is in progress. Previously the only way to trigger an update check was to restart the launcher or wait for the 6-hour auto-check timer.
+
+### Check for updates button
+- MainWindowUpdateViewModel.IsIdle — new computed bool, true when State == Idle. Raised on every state change.
+- CheckForUpdatesCommand — new relay command that calls RunCheckAsync(autoCheckEnabled: true), bypassing the AutoCheck setting so the manual button always works even if auto-update is toggled off.
+- LaunchControlsPanel.axaml — small "Check for updates" button bound to Update.CheckForUpdatesCommand, visible only when Update.IsIdle. Disappears when a check, download, or banner is active.
+
+### Numbers
+- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 2 files modified (MainWindowUpdateViewModel, LaunchControlsPanel.axaml).
 ## v1.10.14 - Released
 Fixes the disk usage display to include legacy ClaudeInstance* directories alongside ClaudeSlot*. These are real Chromium profiles created by older versions of the launcher that the current codebase no longer creates but which still occupy disk space.
 
