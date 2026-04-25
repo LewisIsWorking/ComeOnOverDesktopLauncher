@@ -3,6 +3,7 @@
   <component name="AvaloniaProject">
     <option name="projectPerEditor">
       <map>
+        <entry key="ComeOnOverDesktopLauncher/Views/Controls/ExternalCard.axaml" value="ComeOnOverDesktopLauncher/ComeOnOverDesktopLauncher.csproj" />
         <entry key="ComeOnOverDesktopLauncher/Views/MainWindow.axaml" value="ComeOnOverDesktopLauncher/ComeOnOverDesktopLauncher.csproj" />
       </map>
     </option>

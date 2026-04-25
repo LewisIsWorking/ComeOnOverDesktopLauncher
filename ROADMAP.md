@@ -6,6 +6,18 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.13 - Released
+Adds a **Disk** column to the resource totals row showing the combined on-disk size of all ClaudeSlot* directories. Refreshes at startup and on the manual refresh (?) button — not on every poll tick, since a full recursive scan of 80+ GB takes several seconds.
+
+### Claude disk usage display
+- IClaudeDiskUsageService — new interface in Core with Task<double> GetTotalGbAsync().
+- ClaudeDiskUsageService — enumerates %LOCALAPPDATA%\ClaudeSlot* directories recursively on a thread-pool thread. Has an internal testing seam constructor. Never throws — returns 0.0 on any failure.
+- MainWindowResourceViewModel.TotalDiskGb — new observable property. Refreshed asynchronously at construction and on every ManualRefresh() call. Updates via Dispatcher.UIThread.InvokeAsync so the background scan never touches the UI thread.
+- ResourceTotalsRow.axaml — new "Disk" column (GB, 1dp) with tooltip explaining the refresh cadence.
+- InternalsVisibleTo added to ComeOnOverDesktopLauncher.Core.csproj so the testing seam constructor is reachable from the Tests project.
+
+### Numbers
+- 331 tests passing (4 new in ClaudeDiskUsageServiceTests). 0 warnings, 0 errors. All files <=200 lines.
 ## v1.10.12 - Released
 Raises the slot count spinner maximum from 20 to 100. No technical upper limit exists on slot count; the only practical constraint is available RAM.
 

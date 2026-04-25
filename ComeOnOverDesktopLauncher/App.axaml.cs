@@ -1,4 +1,4 @@
-﻿using System.Runtime.Versioning;
+using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -115,6 +115,7 @@ public partial class App : Application
         services.AddSingleton(provider => provider.GetRequiredService<ISettingsService>().Load());
         services.AddSingleton<IComeOnOverAppService, ComeOnOverAppService>();
         services.AddSingleton<IResourceMonitor, ResourceMonitor>();
+        services.AddSingleton<IClaudeDiskUsageService, ClaudeDiskUsageService>();
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IVersionProvider, VersionProvider>();
         services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();

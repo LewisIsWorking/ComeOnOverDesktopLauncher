@@ -1,4 +1,4 @@
-﻿using ComeOnOverDesktopLauncher.Core.Models;
+using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.Services.Interfaces;
 using ComeOnOverDesktopLauncher.ViewModels;
@@ -36,6 +36,7 @@ public class MainWindowViewModelTestFixture
     public IThumbnailPreviewService PreviewService { get; } = Substitute.For<IThumbnailPreviewService>();
     public IWindowHider WindowHider { get; } = Substitute.For<IWindowHider>();
     public IWindowShower WindowShower { get; } = Substitute.For<IWindowShower>();
+    public IClaudeDiskUsageService DiskUsage { get; } = Substitute.For<IClaudeDiskUsageService>();
     public ILoggingService Logger { get; } = Substitute.For<ILoggingService>();
     public IClaudeProcessScanner Scanner { get; } = Substitute.For<IClaudeProcessScanner>();
     public IClaudeProcessClassifier Classifier { get; } = Substitute.For<IClaudeProcessClassifier>();
@@ -65,6 +66,6 @@ public class MainWindowViewModelTestFixture
             SettingsService, PathResolver, ResourceMonitor,
             StartupService, AutoUpdateService, ApplyFailureDetector, VersionProvider,
             ClaudeVersionResolver, ProcessService, ThumbnailService, PreviewService,
-            WindowHider, WindowShower, slotInstances, externalInstances, Logger);
+            WindowHider, WindowShower, DiskUsage, slotInstances, externalInstances, Logger);
     }
 }

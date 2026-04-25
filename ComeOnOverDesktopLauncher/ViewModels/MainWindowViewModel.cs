@@ -83,6 +83,7 @@ public partial class MainWindowViewModel : ObservableObject
         IThumbnailPreviewService previewService,
         IWindowHider windowHider,
         IWindowShower windowShower,
+        IClaudeDiskUsageService diskUsage,
         SlotInstanceListViewModel slotInstances,
         ExternalInstanceListViewModel externalInstances,
         ILoggingService logger)
@@ -106,7 +107,7 @@ public partial class MainWindowViewModel : ObservableObject
         _isClaudeInstalled = pathResolver.IsClaudeInstalled();
 
         Resources = new MainWindowResourceViewModel(
-            resourceMonitor, thumbnailService,
+            resourceMonitor, thumbnailService, diskUsage,
             SlotInstances, ExternalInstances,
             _settings.ResourceRefreshIntervalSeconds,
             () => ThumbnailsEnabled,
