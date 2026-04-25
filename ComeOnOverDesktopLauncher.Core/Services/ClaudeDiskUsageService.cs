@@ -3,20 +3,35 @@ using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 namespace ComeOnOverDesktopLauncher.Core.Services;
 
 /// <summary>
-/// Computes the combined on-disk size of all <c>ClaudeSlot*</c>
-/// directories under <c>%LOCALAPPDATA%</c> by walking the file tree
-/// on a thread-pool thread.
+/// Computes the combined on-disk size of all Claude data directories
+/// under <c>%LOCALAPPDATA%</c> by walking the file tree on a
+/// thread-pool thread.
 ///
 /// <para>
-/// Each slot stores a full Chromium/Electron profile: IndexedDB,
-/// Cache, GPU cache, extensions, and session data. A 7-slot install
-/// typically occupies 80-90 GB. The scan is slow (~5-10 s) so this
-/// service is called once at startup and on demand — never on the
-/// main refresh tick.
+/// Scans two naming patterns:
+/// <list type="bullet">
+///   <item><c>ClaudeSlot*</c> — current naming scheme</item>
+///   <item><c>ClaudeInstance*</c> — legacy naming scheme from older
+///   launcher versions (directories are real Chromium profiles even
+///   though the launcher no longer creates them)</item>
+/// </list>
+/// Each directory stores a full Chromium/Electron profile: IndexedDB,
+/// Cache, GPU cache, extensions, and session data.
+/// </para>
+///
+/// <para>
+/// The scan is slow on large installs so this service is called once
+/// at startup and on demand — never on the main refresh tick.
 /// </para>
 /// </summary>
 public class ClaudeDiskUsageService : IClaudeDiskUsageService
 {
+    /// <summary>
+    /// Directory name patterns that identify Claude data directories.
+    /// Both are top-level children of <c>%LOCALAPPDATA%</c>.
+    /// </summary>
+    private static readonly string[] ScanPatterns = ["ClaudeSlot*", "ClaudeInstance*"];
+
     private readonly Func<string> _localAppDataResolver;
 
     /// <summary>Production constructor — resolves %LOCALAPPDATA% at call time.</summary>
@@ -36,12 +51,16 @@ public class ClaudeDiskUsageService : IClaudeDiskUsageService
             try
             {
                 var root = _localAppDataResolver();
-                var slotDirs = Directory.GetDirectories(root, "ClaudeSlot*",
-                    SearchOption.TopDirectoryOnly);
-                if (slotDirs.Length == 0) return 0.0;
+                var dirs = ScanPatterns
+                    .SelectMany(p => Directory.GetDirectories(
+                        root, p, SearchOption.TopDirectoryOnly))
+                    .Distinct()
+                    .ToList();
+
+                if (dirs.Count == 0) return 0.0;
 
                 long totalBytes = 0;
-                foreach (var dir in slotDirs)
+                foreach (var dir in dirs)
                 {
                     foreach (var file in Directory.EnumerateFiles(
                         dir, "*", SearchOption.AllDirectories))

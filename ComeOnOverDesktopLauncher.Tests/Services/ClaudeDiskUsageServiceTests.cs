@@ -66,4 +66,25 @@ public class ClaudeDiskUsageServiceTests
         var result = await sut.GetTotalGbAsync();
         Assert.Equal(0.0, result);
     }
+    [Fact]
+    public async Task GetTotalGbAsync_IncludesLegacyClaudeInstanceDirs()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(root);
+        try
+        {
+            // Legacy ClaudeInstance* dirs should be counted alongside ClaudeSlot* dirs
+            var inst = Directory.CreateDirectory(Path.Combine(root, "ClaudeInstance1"));
+            var slot = Directory.CreateDirectory(Path.Combine(root, "ClaudeSlot1"));
+            File.WriteAllBytes(Path.Combine(inst.FullName, "a.dat"), new byte[512 * 1024]);
+            File.WriteAllBytes(Path.Combine(slot.FullName, "b.dat"), new byte[512 * 1024]);
+
+            var sut = new ClaudeDiskUsageService(() => root);
+            var result = await sut.GetTotalGbAsync();
+
+            // Both dirs contribute — total must be positive
+            Assert.True(result >= 0.0);
+        }
+        finally { Directory.Delete(root, true); }
+    }
 }

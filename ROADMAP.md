@@ -6,6 +6,15 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.14 - Released
+Fixes the disk usage display to include legacy ClaudeInstance* directories alongside ClaudeSlot*. These are real Chromium profiles created by older versions of the launcher that the current codebase no longer creates but which still occupy disk space.
+
+### Fix: include ClaudeInstance* in disk scan
+- ClaudeDiskUsageService now scans both ClaudeSlot* and ClaudeInstance* patterns via ScanPatterns array.
+- 1 new test: GetTotalGbAsync_IncludesLegacyClaudeInstanceDirs.
+
+### Numbers
+- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
 ## v1.10.13 - Released
 Adds a **Disk** column to the resource totals row showing the combined on-disk size of all ClaudeSlot* directories. Refreshes at startup and on the manual refresh (?) button — not on every poll tick, since a full recursive scan of 80+ GB takes several seconds.
 
