@@ -6,6 +6,17 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.16 - Released
+Fixes the disk usage display to show "Scanning..." while the background file scan is in progress, preventing stale data from being shown as if it were the current result. Also corrects the scan total: on a typical install (7 ClaudeSlot* + 4 large ClaudeInstance* dirs) the true total is ~133 GB, not the ~48 GB the previous version showed.
+
+### Fix: Scanning... indicator during disk scan
+- MainWindowResourceViewModel.IsDiskScanning — new observable bool, set to true before GetTotalGbAsync() fires and false when it completes.
+- RefreshDiskUsageAsync now sets IsDiskScanning = true on the UI thread before the scan starts, and alse + updates TotalDiskGb when done.
+- ResourceTotalsRow.axaml — "Scanning..." TextBlock visible when IsDiskScanning is true (grey, with tooltip explaining the delay). GB TextBlock hidden while scanning. Both mutually exclusive.
+
+### Numbers
+- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
+- 2 files modified (MainWindowResourceViewModel, ResourceTotalsRow.axaml).
 ## v1.10.15 - Released
 Adds a manual "Check for updates" button visible in the launcher when no update is in progress. Previously the only way to trigger an update check was to restart the launcher or wait for the 6-hour auto-check timer.
 

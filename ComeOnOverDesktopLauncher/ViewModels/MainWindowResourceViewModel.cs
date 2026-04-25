@@ -13,15 +13,12 @@ namespace ComeOnOverDesktopLauncher.ViewModels;
 /// every tick.
 ///
 /// <para>
-/// Extracted from <see cref="MainWindowViewModel"/> in v1.10.6.
-/// Same pattern as <see cref="MainWindowUpdateViewModel"/> etc.
-/// </para>
-///
-/// <para>
 /// <see cref="TotalDiskGb"/> is refreshed asynchronously on
-/// construction and on each manual refresh — never on every
-/// poll tick, because a full recursive scan of the slot
-/// directories takes several seconds.
+/// construction and on each manual refresh. The scan walks all
+/// ClaudeSlot* and ClaudeInstance* directories recursively and
+/// can take several minutes on large installs (~133 GB).
+/// <see cref="IsDiskScanning"/> is true while the scan is running
+/// so the UI can show "Scanning..." instead of a stale figure.
 /// </para>
 /// </summary>
 public partial class MainWindowResourceViewModel : ObservableObject
@@ -42,6 +39,7 @@ public partial class MainWindowResourceViewModel : ObservableObject
     [ObservableProperty] private double _totalRamMb;
     [ObservableProperty] private double _totalCpuPercent;
     [ObservableProperty] private double _totalDiskGb;
+    [ObservableProperty] private bool _isDiskScanning;
     [ObservableProperty] private int _intervalSeconds;
 
     /// <summary>True when at least one Claude process is running.</summary>
@@ -72,7 +70,6 @@ public partial class MainWindowResourceViewModel : ObservableObject
         _timer.Tick += (_, _) => Refresh();
         _timer.Start();
 
-        // Kick off initial disk scan in background; won't block startup.
         _ = RefreshDiskUsageAsync();
     }
 
@@ -103,14 +100,20 @@ public partial class MainWindowResourceViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Scans all ClaudeSlot* directories on a background thread and
-    /// updates <see cref="TotalDiskGb"/> on the UI thread.
-    /// Fire-and-forget safe — exceptions are swallowed by the service.
+    /// Scans all Claude data directories on a background thread.
+    /// Sets <see cref="IsDiskScanning"/> true for the duration so
+    /// the UI shows "Scanning..." rather than a stale figure.
+    /// On large installs (~133 GB) the scan can take several minutes.
     /// </summary>
     private async Task RefreshDiskUsageAsync()
     {
+        await Dispatcher.UIThread.InvokeAsync(() => IsDiskScanning = true);
         var gb = await _diskUsage.GetTotalGbAsync().ConfigureAwait(false);
-        await Dispatcher.UIThread.InvokeAsync(() => TotalDiskGb = gb);
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            TotalDiskGb = gb;
+            IsDiskScanning = false;
+        });
     }
 
     partial void OnIntervalSecondsChanged(int value)
