@@ -66,3 +66,11 @@ Added in v1.10.7. Package: `Avalonia.Controls.WebView 12.0.0`. `NativeWebView` i
 - User's Windows GitHub Desktop is the shiftkey fork v3.4.12-linux1.
 - AutoHotkey v2 script at `%USERPROFILE%\Documents\AutoHotkey\Continue.ahk`.
 - The user has a multi-monitor setup. Primary monitor is 2560x1440. Prefer `Windows-MCP:Click` tool for automated clicks (handles DPI correctly).
+
+## Avalonia.Controls.WebView focus crash - global exception handler
+
+Added in v1.10.17. The Avalonia.Controls.WebView 12.0.0 package has a known crash where `CoreWebView2Controller.MoveFocus` throws `System.ArgumentException` (HRESULT 0x80070057) when the underlying WebView2 is in a transient state during window activation. The exception bubbles from `NativeWebView.OnGotFocus` -> `WindowBase.HandleActivated` -> Win32 `WndProc` and kills the process because no Avalonia layer catches it.
+
+**Fix**: `App.OnFrameworkInitializationCompleted` calls `HookGlobalExceptionHandlers()` which subscribes to `Dispatcher.UIThread.UnhandledException`, logs the exception, and sets `e.Handled = true`. The launcher survives the crash and the user keeps working. Every swallowed exception is logged so real bugs remain discoverable in `%APPDATA%\ComeOnOverDesktopLauncher\logs\`.
+
+**Diagnostic pattern**: when the launcher dies abruptly with no stack in the launcher log, check the Windows Application event log for `ComeOnOverDesktopLauncher.exe` faulting application entries - the .NET Runtime usually logs the unhandled exception there before the process exits.

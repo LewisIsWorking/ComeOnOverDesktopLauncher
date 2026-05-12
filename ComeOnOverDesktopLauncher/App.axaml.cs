@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using ComeOnOverDesktopLauncher.Core.Services;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 using ComeOnOverDesktopLauncher.Services;
@@ -30,6 +31,7 @@ public partial class App : Application
     public override void OnFrameworkInitializationCompleted()
     {
         _serviceProvider = ConfigureServices().BuildServiceProvider();
+        HookGlobalExceptionHandlers();
         _serviceProvider.GetRequiredService<IClaudePathCache>().Refresh();
 
         // Self-heal any Start Menu shortcut the Velopack updater may
@@ -87,6 +89,37 @@ public partial class App : Application
         _mainWindow.Show();
         _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Activate();
+    }
+
+    /// <summary>
+    /// Catches unhandled UI-thread exceptions so the launcher
+    /// survives them. Primary motivator (v1.10.17): the known
+    /// Avalonia.Controls.Win.WebView2 focus crash where
+    /// CoreWebView2Controller.MoveFocus throws ArgumentException
+    /// during window activation when the WebView is in a
+    /// transient state. The exception bubbles to the Win32
+    /// message pump and kills the process otherwise. We log
+    /// every swallowed exception so real bugs remain discoverable.
+    /// </summary>
+    private void HookGlobalExceptionHandlers()
+    {
+        Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            var logger = _serviceProvider?.GetService<ILoggingService>();
+            logger?.LogError(
+                $"Swallowed UI exception: {e.Exception.GetType().FullName}: {e.Exception.Message}",
+                e.Exception);
+            e.Handled = true;
+        };
+
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            var logger = _serviceProvider?.GetService<ILoggingService>();
+            var ex = e.ExceptionObject as Exception;
+            logger?.LogError(
+                $"Unhandled AppDomain exception (terminating={e.IsTerminating}): {ex?.GetType().FullName}: {ex?.Message}",
+                ex);
+        };
     }
 
     [SupportedOSPlatform("windows")]

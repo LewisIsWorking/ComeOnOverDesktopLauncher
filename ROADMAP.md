@@ -6,6 +6,15 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.17 - Released
+**Critical fix.** Catches unhandled UI-thread exceptions so the launcher survives them. Eliminates the recurring crash where the embedded WebView2 usage panel throws `ArgumentException` from `CoreWebView2Controller.MoveFocus` during window activation, bubbling unhandled to the Win32 message pump and killing the process.
+
+### Global exception handler
+- `App.HookGlobalExceptionHandlers()` - called at start of `OnFrameworkInitializationCompleted`. Subscribes to `Dispatcher.UIThread.UnhandledException` (logs + `e.Handled = true`) and `AppDomain.CurrentDomain.UnhandledException` (logs only - AppDomain exceptions are still fatal in .NET 5+).
+- Documented in `docs/dev/LEARNINGS.md`.
+
+### Numbers
+- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
 ## v1.10.16 - Released
 Fixes the disk usage display to show "Scanning..." while the background file scan is in progress, preventing stale data from being shown as if it were the current result. Also corrects the scan total: on a typical install (7 ClaudeSlot* + 4 large ClaudeInstance* dirs) the true total is ~133 GB, not the ~48 GB the previous version showed.
 
@@ -14,9 +23,6 @@ Fixes the disk usage display to show "Scanning..." while the background file sca
 - RefreshDiskUsageAsync now sets IsDiskScanning = true on the UI thread before the scan starts, and alse + updates TotalDiskGb when done.
 - ResourceTotalsRow.axaml — "Scanning..." TextBlock visible when IsDiskScanning is true (grey, with tooltip explaining the delay). GB TextBlock hidden while scanning. Both mutually exclusive.
 
-### Numbers
-- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 2 files modified (MainWindowResourceViewModel, ResourceTotalsRow.axaml).
 ## v1.10.15 - Released
 Adds a manual "Check for updates" button visible in the launcher when no update is in progress. Previously the only way to trigger an update check was to restart the launcher or wait for the 6-hour auto-check timer.
 
@@ -25,9 +31,6 @@ Adds a manual "Check for updates" button visible in the launcher when no update 
 - CheckForUpdatesCommand — new relay command that calls RunCheckAsync(autoCheckEnabled: true), bypassing the AutoCheck setting so the manual button always works even if auto-update is toggled off.
 - LaunchControlsPanel.axaml — small "Check for updates" button bound to Update.CheckForUpdatesCommand, visible only when Update.IsIdle. Disappears when a check, download, or banner is active.
 
-### Numbers
-- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 2 files modified (MainWindowUpdateViewModel, LaunchControlsPanel.axaml).
 ## v1.10.14 - Released
 Fixes the disk usage display to include legacy ClaudeInstance* directories alongside ClaudeSlot*. These are real Chromium profiles created by older versions of the launcher that the current codebase no longer creates but which still occupy disk space.
 
@@ -35,8 +38,6 @@ Fixes the disk usage display to include legacy ClaudeInstance* directories along
 - ClaudeDiskUsageService now scans both ClaudeSlot* and ClaudeInstance* patterns via ScanPatterns array.
 - 1 new test: GetTotalGbAsync_IncludesLegacyClaudeInstanceDirs.
 
-### Numbers
-- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
 ## v1.10.13 - Released
 Adds a **Disk** column to the resource totals row showing the combined on-disk size of all ClaudeSlot* directories. Refreshes at startup and on the manual refresh (?) button — not on every poll tick, since a full recursive scan of 80+ GB takes several seconds.
 
@@ -47,20 +48,12 @@ Adds a **Disk** column to the resource totals row showing the combined on-disk s
 - ResourceTotalsRow.axaml — new "Disk" column (GB, 1dp) with tooltip explaining the refresh cadence.
 - InternalsVisibleTo added to ComeOnOverDesktopLauncher.Core.csproj so the testing seam constructor is reachable from the Tests project.
 
-### Numbers
-- 331 tests passing (4 new in ClaudeDiskUsageServiceTests). 0 warnings, 0 errors. All files <=200 lines.
 ## v1.10.12 - Released
 Raises the slot count spinner maximum from 20 to 100. No technical upper limit exists on slot count; the only practical constraint is available RAM.
 
-### Numbers
-- 327 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 1 file modified (LaunchControlsPanel.axaml).
 ## v1.10.11 - Released
 Raises the slot count spinner maximum from 10 to 20. There is no technical upper limit on slot count (the scanner, classifier, and data directories all work for any slot number); the only practical constraint is available RAM (~300-500 MB per Claude instance).
 
-### Numbers
-- 327 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 1 file modified (LaunchControlsPanel.axaml).
 ## v1.10.10 - Released
 Adds a per-slot activity signal to each slot card — "Active now", "Active Xm ago", or "Idle" — derived from when the slot's CPU last crossed 3%. Also closes the per-slot activity preview backlog item: thumbnails were already shipped in v1.9.x; this adds the missing activity timestamp signal. Also ticks off the "Submit to awesome-avalonia" backlog item.
 
@@ -73,9 +66,6 @@ Adds a per-slot activity signal to each slot card — "Active now", "Active Xm a
 - **Per-slot activity preview** — closed as shipped. Thumbnails landed in v1.9.x; last-active timestamp lands here.
 - **Submit to awesome-avalonia** — PR opened to AvaloniaCommunity/awesome-avalonia adding ComeOnOver Desktop Launcher to the Open Source Applications section.
 
-### Numbers
-- 327 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 1 file added (ClaudeInstanceViewModelActivityTests). 2 files modified (ClaudeInstanceViewModel, SlotCard.axaml).
 ## v1.10.9 - Released
 Per-slot RAM and CPU totals now match Windows Task Manager by aggregating the full Electron process tree (renderer, GPU, crashpad, network service, node-service) into each slot card. Also ships a large test health pass: 57 new tests across 7 new files, covering tree analysis, child-snapshot aggregation, resource monitor CPU delta, thumbnail refresher, slot callback binder, update orchestrator, and banner text formatting.
 
@@ -92,9 +82,6 @@ Per-slot RAM and CPU totals now match Windows Task Manager by aggregating the fu
 - `MainWindowUpdateViewModelBannerTests` — replaced four tautological same-variable comparisons (CS1718) with three meaningful enum-distinctness assertions (`Downloading ≠ Idle ≠ ReadyToInstall ≠ Failed ≠ ApplyFailed`). Zero warnings.
 - 7 new test files: `ClaudeProcessTreeAnalyserTests` (6), `SlotInstanceListViewModelAggregationTests` (6), `ResourceMonitorCpuTests` (3), `ExternalInstanceViewModelGapTests` (4), `MainWindowUpdateViewModelBannerTests` (14), `SlotCallbackBinderTests` (7), `ThumbnailRefresherTests` (8).
 
-### Numbers
-- 321 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 2 files added (`ClaudeProcessTreeAnalyser`, `ClaudeProcessTreeAnalyserTests`). 4 files modified in production code + 6 new/modified test files.
 
 ## v1.10.8 - Released
 Fixes the version footer display (was stuck at v1.10.5 since project creation) and adds repo health infrastructure: a version-consistency test that catches csproj/assembly drift in CI, and a pre-push git hook that runs the full test suite before every push.
@@ -107,8 +94,6 @@ Fixes the version footer display (was stuck at v1.10.5 since project creation) a
 - `VersionConsistencyTests` — asserts that compiled `AssemblyVersion` matches the csproj `<Version>` at the `Major.Minor.Build` level. Catches any future divergence before it reaches users.
 - `docs/dev/hooks/pre-push` — git hook that runs `dotnet test --verbosity quiet` before every `git push`. Aborts the push on any test failure. Install once: `cp docs/dev/hooks/pre-push .git/hooks/pre-push`. Documented in `BUILD-AND-TOOLING.md`.
 
-### Numbers
-- 264 tests passing. 0 warnings, 0 errors. All files <=200 lines.
 
 ## v1.10.7 - Released
 Embeds the Claude usage dashboard directly into the main launcher window as a side-by-side panel, adds a responsive breakpoint that stacks vertically on narrow windows, and fixes the resource total underestimation.
@@ -127,10 +112,6 @@ Embeds the Claude usage dashboard directly into the main launcher window as a si
 ### RAM/CPU total fix
 - IProcessService.GetAllProcessSnapshots added. Unlike GetWindowedProcessSnapshots, it captures all claude.exe processes including child/helper processes (renderer, GPU, crashpad, network service, node-service, etc.) that Electron spawns per instance.
 - ResourceMonitor switched from GetWindowedProcessSnapshots to GetAllProcessSnapshots so TotalRamMb and TotalCpuPercent match what Windows Task Manager shows for the full process tree. Per-slot card numbers still show the browser-main process only (full-tree aggregation is a backlog item).
-### Numbers
-- 263 tests passing. 0 warnings, 0 errors. All files <=200 lines.
-- 1 new package (Avalonia.Controls.WebView 12.0.0). 8 files modified + 1 test file updated.
-
 ## v1.10.6 - Released
 Completes the show/hide-button pair introduced in v1.10.5. Adds a Show button to every TrayCard row so hidden Claude slots can be restored to the foreground directly from the launcher without digging through Claude system-tray menu. Also fixes a latent bug where tray-resident slots were invisible to the resource monitor and were dropped from both collections on the next poll.
 ### New IWindowShower service
@@ -146,11 +127,6 @@ Completes the show/hide-button pair introduced in v1.10.5. Adds a Show button to
 ### UI: Show button on TrayCard
 - Teal (hex 80CBC4) Show button in column 3 of the TrayCard stats row. Quit moves to column 4.
 - ClaudeInstanceViewModel.ShowCommand routes through a new OnShow callback, wired by SlotCallbackBinder to IWindowShower.TryShow.
-### Numbers
-- 263 tests passing. 0 warnings, 0 errors.
-- 2 files added (IWindowShower, Win32WindowShower). 7 files modified + 3 test files updated.
-- All files <=200 lines.
-
 ## v1.10.5 - Released
 Adds a Hide button to every slot card so users can close a Claude slot to the system tray without terminating the process.
 
@@ -164,10 +140,6 @@ Adds a Hide button to every slot card so users can close a Claude slot to the sy
 - `ClaudeInstanceViewModel.HideCommand` routes through a new `OnHide` callback, wired up by `SlotCallbackBinder` to call `IWindowHider.TryHide`.
 - No refresh prod needed after hide - the next scanner poll naturally moves the slot into the TrayCard list.
 
-### Numbers
-- 263 tests passing. 0 warnings, 0 errors.
-- 2 files added (`IWindowHider`, `Win32WindowHider`). 5 files modified + XAML (`SlotCard.axaml`) + test fixture. All files <=200 lines.
-- Note: Show-from-tray (the counterpart) was completed in v1.10.6.
 
 ## v2.0 - ComeOnOver Integration
 
