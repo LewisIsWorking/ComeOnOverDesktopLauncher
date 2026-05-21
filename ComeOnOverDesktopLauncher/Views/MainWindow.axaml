@@ -65,8 +65,16 @@
                       Background="#2A2A2A"/>
 
         <!-- Right/bottom panel: Claude usage dashboard. -->
+        <!-- Focusable="False" prevents the v1.10.17 crash:
+             when the window is activated, Avalonia's focus system
+             calls NativeWebView.OnGotFocus -> WebView2BaseAdapter.Focus
+             -> CoreWebView2Controller.MoveFocus, which throws
+             ArgumentException for transient WebView2 states. Setting
+             Focusable=False short-circuits that path entirely. Mouse
+             interaction still works (pointer events bypass focus). -->
         <NativeWebView x:Name="UsageWebView"
                        Source="https://claude.ai/settings/usage"
+                       Focusable="False"
                        NavigationCompleted="OnUsageNavigationCompleted"/>
 
     </Grid>

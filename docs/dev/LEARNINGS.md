@@ -74,3 +74,13 @@ Added in v1.10.17. The Avalonia.Controls.WebView 12.0.0 package has a known cras
 **Fix**: `App.OnFrameworkInitializationCompleted` calls `HookGlobalExceptionHandlers()` which subscribes to `Dispatcher.UIThread.UnhandledException`, logs the exception, and sets `e.Handled = true`. The launcher survives the crash and the user keeps working. Every swallowed exception is logged so real bugs remain discoverable in `%APPDATA%\ComeOnOverDesktopLauncher\logs\`.
 
 **Diagnostic pattern**: when the launcher dies abruptly with no stack in the launcher log, check the Windows Application event log for `ComeOnOverDesktopLauncher.exe` faulting application entries - the .NET Runtime usually logs the unhandled exception there before the process exits.
+
+## WndProc-synchronous exceptions bypass Dispatcher.UnhandledException
+
+Discovered in v1.10.18 after v1.10.17 shipped with what turned out to be an ineffective fix. `Dispatcher.UIThread.UnhandledException` only fires for exceptions thrown during `Invoke`/`Post` operations on the dispatcher. Exceptions thrown synchronously from inside a Win32 WndProc callback (focus events, paint events, etc.) bypass the dispatcher entirely - they propagate up through native code to the Win32 message pump and kill the process before any managed handler can intercept them.
+
+**Concrete case**: the WebView2 `CoreWebView2Controller.MoveFocus` ArgumentException crash originates from `NativeWebView.OnGotFocus`, which is called synchronously by `WindowBase.HandleActivated` from `WindowImpl.AppWndProc`. The Dispatcher.UnhandledException hook from v1.10.17 was registered but never fired for this crash, and v1.10.17 continued to crash identically.
+
+**Correct fix**: prevent the exception at the source. v1.10.18 sets `Focusable="False"` on the NativeWebView so the OnGotFocus -> MoveFocus path is never entered. Mouse interaction still works because pointer events don't trigger focus.
+
+**Diagnostic signature**: when a crash logged in the Windows Application event log shows "The process was terminated due to an unhandled exception" with a stack trace that ends in `WindowImpl.AppWndProc` or any `HandleXxx` method on `WindowBase`, this is a WndProc-synchronous exception. Don't try to catch it - find what triggers it and prevent the trigger.

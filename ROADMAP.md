@@ -6,6 +6,11 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.18 - Released
+**Critical fix #2.** v1.10.17's global exception handler did NOT catch the WebView2 focus crash - because that exception is thrown synchronously inside a Win32 WndProc callback, bypassing the Avalonia dispatcher entirely. Fixed by setting `Focusable="False"` on the embedded NativeWebView so the crash path is never entered. Mouse interaction still works.
+
+### Numbers
+- 332 tests passing. 0 warnings, 0 errors. All files <=200 lines.
 ## v1.10.17 - Released
 **Critical fix.** Catches unhandled UI-thread exceptions so the launcher survives them. Eliminates the recurring crash where the embedded WebView2 usage panel throws `ArgumentException` from `CoreWebView2Controller.MoveFocus` during window activation, bubbling unhandled to the Win32 message pump and killing the process.
 
