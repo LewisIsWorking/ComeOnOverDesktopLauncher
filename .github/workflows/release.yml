@@ -104,3 +104,91 @@ jobs:
             --publish `
             --releaseName "ComeOnOver Desktop Launcher ${{ github.ref_name }}" `
             --tag ${{ github.ref_name }}
+
+  build-linux:
+    # Runs after the Windows job creates the GitHub Release; appends a
+    # self-contained Linux x64 tarball to it. Sequential rather than
+    # parallel so the Linux upload can rely on the Release already
+    # existing. Added in v1.10.21 (Linux MVP M4).
+    needs: build-and-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run tests on Linux
+        # Validates the Linux build of the test suite (different file
+        # set from Windows due to <Compile Remove> on Win-only tests),
+        # so any future cross-platform regression surfaces here rather
+        # than only on Lewis's laptop.
+        run: dotnet test ComeOnOverDesktopLauncher.Tests/ComeOnOverDesktopLauncher.Tests.csproj --configuration Release
+
+      - name: Publish Linux x64 self-contained
+        # Multi-file output (no PublishSingleFile) for the same reason
+        # the Windows publish is multi-file: easier to debug, faster
+        # cold start, and users can inspect/replace individual DLLs.
+        # Self-contained so end users don't need .NET runtime installed.
+        run: |
+          dotnet publish ComeOnOverDesktopLauncher/ComeOnOverDesktopLauncher.csproj \
+            --configuration Release \
+            --runtime linux-x64 \
+            --self-contained true \
+            --output publish-linux \
+            -p:PublishSingleFile=false
+
+      - name: Add Linux README and ensure executable bit
+        # Drop a short README into the publish dir so users know
+        # what they downloaded. chmod +x is belt-and-braces - the
+        # publish process should already set it but tar's behaviour
+        # has bitten me before on stripped CI runners.
+        run: |
+          cat > publish-linux/README-LINUX.txt << 'EOF'
+          ComeOnOver Desktop Launcher - Linux build
+
+          This is a self-contained .NET 10 build for Linux x64. No
+          runtime install required.
+
+          To run:
+            ./ComeOnOverDesktopLauncher
+
+          Tested on Ubuntu 24.04+ (kernel 6.x and newer). Wayland and
+          X11 sessions are both supported via Avalonia's FreeDesktop
+          backend.
+
+          The Linux build is feature-reduced compared to Windows:
+          - Embedded usage panel (Claude WebView) is Windows-only.
+          - Window hide/show is a no-op (Wayland restricts cross-app
+            window control without a portal).
+          - Auto-update is disabled; check GitHub Releases manually.
+
+          See https://github.com/LewisIsWorking/ComeOnOverDesktopLauncher
+          for source, issues, and release notes.
+          EOF
+          chmod +x publish-linux/ComeOnOverDesktopLauncher
+
+      - name: Create tarball
+        # Excluding ".pdb" debug symbols shaves ~30 MB off the tarball
+        # without affecting user-facing functionality. The -C flag
+        # tars the directory CONTENTS not the directory itself so
+        # users get a flat extract.
+        run: |
+          tar --exclude='*.pdb' -czf \
+            ComeOnOverDesktopLauncher-linux-x64.tar.gz \
+            -C publish-linux .
+          ls -lh ComeOnOverDesktopLauncher-linux-x64.tar.gz
+
+      - name: Upload Linux tarball to GitHub Release
+        # --clobber overwrites any prior asset with the same name,
+        # safe-by-default if this job ever reruns on the same tag.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" \
+            ComeOnOverDesktopLauncher-linux-x64.tar.gz \
+            --clobber --repo ${{ github.repository }}

@@ -6,6 +6,20 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.21 - Released
+Linux MVP M4: GitHub Actions now produces a Linux x64 artifact alongside the existing Windows artifacts on every release. A new `build-linux` job runs after the Windows job (so it can append to the existing GitHub Release), runs the test suite on Ubuntu (catching cross-platform regressions in CI rather than only on Lewis's laptop), publishes a self-contained `linux-x64` build, tars it (excluding pdbs), and uploads `ComeOnOverDesktopLauncher-linux-x64.tar.gz` via `gh release upload`. Tarball is ~44 MB compressed, 224 files, valid ELF binary with executable bit preserved. Linux end-users now download a single file, `tar -xzf`, and `./ComeOnOverDesktopLauncher`.
+
+### Why sequential not parallel
+The Windows job creates the GitHub Release via `vpk upload github --publish`. The Linux job uses `gh release upload --clobber` to append to it. If the jobs ran in parallel, the Linux upload could race the Windows release creation. Sequential gates this correctly and only costs ~2 extra minutes of wall time per release.
+
+### What's NOT in v1.10.21
+- AppImage / .deb packaging (deferred to M5; users who want a desktop entry must create their own .desktop file for now).
+- Linux auto-update (deferred; users check GitHub Releases manually).
+- ARM64 Linux (deferred; only linux-x64 is built).
+
+### Next
+M5 - AppImage or .deb packaging so the launcher gains a Start Menu entry and proper system integration on Linux distros.
+
 ## v1.10.20 - Released
 Linux MVP M3: real `ProcfsClaudeProcessScanner` parsing `/proc/*/cmdline`. Replaces the v1.10.19 empty stub so running Claude instances now appear in the launcher's slot/external lists on Linux just like they do on Windows.
 
