@@ -1,6 +1,5 @@
 using System;
 using System.ComponentModel;
-using System.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -15,14 +14,6 @@ public partial class MainWindow : Window
 {
     private const double BreakpointWidth = 900;
 
-    // Persistent WebView2 profile folder — user logs in to claude.ai once
-    // and auth cookies survive restarts. Set via reflection on
-    // WindowsWebView2EnvironmentRequestedEventArgs.UserDataFolder so the
-    // code compiles cross-platform without #if guards.
-    private static readonly string WebViewProfileFolder = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "ComeOnOverDesktopLauncher", "webview-profile");
-
     public IWindowSnapshotService? SnapshotService { get; set; }
 
     public MainWindow()
@@ -34,8 +25,20 @@ public partial class MainWindow : Window
             totalsRow.CopyClicked += OnCopyScreenshotClick;
 
         WireContextMenu();
-        UsageWebView.EnvironmentRequested += OnUsageEnvironmentRequested;
+        InitializeUsagePanel();
     }
+
+    /// <summary>
+    /// Wires up the Claude usage panel (right/bottom of the window).
+    /// On Windows this creates a NativeWebView pointing at
+    /// claude.ai/settings/usage; on Linux it's a no-op (the panel
+    /// stays an empty ContentControl). Implemented as a partial
+    /// method so the Linux build doesn't need to reference the
+    /// WebView2 package. The Windows implementation lives in
+    /// MainWindow.WebView.cs which is only compiled when
+    /// '$(OS)' == 'Windows_NT'.
+    /// </summary>
+    partial void InitializeUsagePanel();
 
     protected override void OnDataContextChanged(EventArgs e)
     {
@@ -101,9 +104,9 @@ public partial class MainWindow : Window
         var launcherCol = usageOnLeft ? 2 : 0;
         var usageCol    = usageOnLeft ? 0 : 2;
 
-        Grid.SetRow(LauncherPanel, 0);  Grid.SetColumn(LauncherPanel, launcherCol);
-        Grid.SetRow(PanelSplitter, 0);  Grid.SetColumn(PanelSplitter, 1);
-        Grid.SetRow(UsageWebView, 0);   Grid.SetColumn(UsageWebView, usageCol);
+        Grid.SetRow(LauncherPanel, 0);   Grid.SetColumn(LauncherPanel, launcherCol);
+        Grid.SetRow(PanelSplitter, 0);   Grid.SetColumn(PanelSplitter, 1);
+        Grid.SetRow(UsagePanelHost, 0);  Grid.SetColumn(UsagePanelHost, usageCol);
 
         PanelSplitter.ResizeDirection = GridResizeDirection.Columns;
     }
@@ -113,9 +116,9 @@ public partial class MainWindow : Window
         MainGrid.ColumnDefinitions = new ColumnDefinitions("*");
         MainGrid.RowDefinitions = new RowDefinitions("*,4,320");
 
-        Grid.SetRow(LauncherPanel, 0);  Grid.SetColumn(LauncherPanel, 0);
-        Grid.SetRow(PanelSplitter, 1);  Grid.SetColumn(PanelSplitter, 0);
-        Grid.SetRow(UsageWebView, 2);   Grid.SetColumn(UsageWebView, 0);
+        Grid.SetRow(LauncherPanel, 0);   Grid.SetColumn(LauncherPanel, 0);
+        Grid.SetRow(PanelSplitter, 1);   Grid.SetColumn(PanelSplitter, 0);
+        Grid.SetRow(UsagePanelHost, 2);  Grid.SetColumn(UsagePanelHost, 0);
 
         PanelSplitter.ResizeDirection = GridResizeDirection.Rows;
     }
@@ -150,32 +153,6 @@ public partial class MainWindow : Window
         };
 
         PanelSplitter.ContextMenu = menu;
-    }
-
-    // -------------------------------------------------------------------
-    // WebView: auth persistence + redirect fix
-    // -------------------------------------------------------------------
-
-    private static void OnUsageEnvironmentRequested(
-        object? sender,
-        WebViewEnvironmentRequestedEventArgs args)
-    {
-        try
-        {
-            args.GetType().GetProperty("UserDataFolder")
-                ?.SetValue(args, WebViewProfileFolder);
-        }
-        catch
-        {
-            // Non-Windows platform or future package change — skip silently.
-        }
-    }
-
-    private void OnUsageNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs args)
-    {
-        var uri = UsageWebView.Source?.ToString()?.TrimEnd('/');
-        if (uri == "https://claude.ai")
-            UsageWebView.Source = new Uri("https://claude.ai/settings/usage");
     }
 
     // -------------------------------------------------------------------

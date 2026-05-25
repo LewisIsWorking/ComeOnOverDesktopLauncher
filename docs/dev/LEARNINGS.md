@@ -84,3 +84,17 @@ Discovered in v1.10.18 after v1.10.17 shipped with what turned out to be an inef
 **Correct fix**: prevent the exception at the source. v1.10.18 sets `Focusable="False"` on the NativeWebView so the OnGotFocus -> MoveFocus path is never entered. Mouse interaction still works because pointer events don't trigger focus.
 
 **Diagnostic signature**: when a crash logged in the Windows Application event log shows "The process was terminated due to an unhandled exception" with a stack trace that ends in `WindowImpl.AppWndProc` or any `HandleXxx` method on `WindowBase`, this is a WndProc-synchronous exception. Don't try to catch it - find what triggers it and prevent the trigger.
+
+## Cross-platform build for Windows + Linux from one codebase (v1.10.19)
+
+Three layered mechanisms keep the source tree single-targeted while producing two artefacts. Picking the right one per situation is the trick:
+
+**csproj `<PackageReference Condition="'$(OS)' == 'Windows_NT'">`** for packages that have no Linux story at all (`Avalonia.Controls.WebView`, `Velopack`, `System.Management`, `System.Drawing.Common`). The package is just absent on Linux builds, and any code referencing types from those packages must be excluded from the Linux compile.
+
+**csproj `<Compile Remove="..." Condition="'$(OS)' != 'Windows_NT'">`** for source files that reference Windows-only types (`Win32WindowHider`, `WmiClaudeProcessScanner`, etc.). The file simply isn't part of the Linux build. The DI graph routes around the absence via per-platform registration branches in `App.axaml.cs`.
+
+**`#if WINDOWS` preprocessor blocks** for files that are *mostly* cross-platform but have one or two Windows-only references — `Program.cs` (Velopack hook) and the call site of `RegisterWindowsServices` in `App.axaml.cs`. The `WINDOWS` constant is set by `<DefineConstants Condition="'$(OS)' == 'Windows_NT'">$(DefineConstants);WINDOWS</DefineConstants>` in the main csproj. Sparingly used; the other two mechanisms are cleaner where they fit.
+
+**XAML can't be conditionally compiled** the way C# can. `Avalonia.Controls.WebView`'s `<NativeWebView>` element won't resolve on Linux because the package isn't there. Solution: keep the XAML cross-platform with a placeholder (`<ContentControl x:Name="UsagePanelHost"/>`), wire any Windows-only control creation up in code-behind, and split the code-behind into a cross-platform partial class plus a `<Compile Remove>`'d Windows-only partial class. The cross-platform partial declares an unimplemented partial method like `partial void InitializeUsagePanel();` which the Windows partial implements; on Linux the call site compiles away to nothing.
+
+**SystemProcessService had `[SupportedOSPlatform("windows")]`** despite using cross-platform `System.Diagnostics.Process` APIs. Removed in v1.10.19. `MainWindowHandle` returns `IntPtr.Zero` on Linux processes which is harmless; the call works it just always returns no-window. Don't add platform attributes just because the class was *written* on Windows; only add them when the APIs actually demand it.

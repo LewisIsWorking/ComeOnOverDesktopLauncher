@@ -1,37 +1,35 @@
 using System;
-using System.Runtime.Versioning;
 using Avalonia;
-using ComeOnOverDesktopLauncher.Services;
+#if WINDOWS
 using Velopack;
+using ComeOnOverDesktopLauncher.Services;
+#endif
 
 namespace ComeOnOverDesktopLauncher;
 
 /// <summary>
-/// Entry point. Marked Windows-only because the app uses Windows-specific APIs
-/// (registry for startup, MSIX package queries for Claude path resolution).
-/// When cross-platform support is added in v2.0, platform-specific implementations
-/// behind IRegistryService and IClaudePathResolver will remove this requirement.
+/// Entry point.
 ///
-/// <para>
-/// v1.10.0: <see cref="VelopackApp.Build"/> must be invoked as the very
-/// first operation in <see cref="Main"/>, before Avalonia boots. Velopack
-/// uses the install/update/uninstall hooks as separate process invocations:
-/// <c>Update.exe</c> launches our app with special command-line arguments
-/// when it needs us to handle a lifecycle event, and <c>VelopackApp.Run()</c>
-/// intercepts those invocations and exits before any Avalonia initialisation
-/// would fire a window. Putting it later than this point means the hook
-/// UX stutters (brief window flash) or outright breaks (hook never fires).
-/// </para>
+/// <para>Windows: VelopackApp.Build must run as the very first
+/// operation in Main, before Avalonia boots, because Velopack uses
+/// our exe for its install/update/uninstall hooks as separate
+/// process invocations and the hook handler must short-circuit
+/// before any Avalonia window would flash up.</para>
+///
+/// <para>Linux: no Velopack on this platform (auto-update is
+/// deferred to a later milestone), so Main jumps straight into the
+/// Avalonia bootstrap.</para>
 /// </summary>
-[SupportedOSPlatform("windows")]
 sealed class Program
 {
     [STAThread]
     public static void Main(string[] args)
     {
+#if WINDOWS
         VelopackApp.Build()
             .OnFirstRun(_ => VelopackAutoUpdateService.FirstRunAfterUpdate = true)
             .Run();
+#endif
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

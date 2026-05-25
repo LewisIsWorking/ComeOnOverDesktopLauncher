@@ -6,6 +6,29 @@ Current and upcoming work. Historical release notes:
 - [`docs/release-history/v1.10.md`](docs/release-history/v1.10.md) - Velopack migration through v1.10.3 icon-cache polish
 - [`docs/RELEASE-HISTORY.md`](docs/RELEASE-HISTORY.md) - index pointing at the above
 
+## v1.10.19 - Released
+First Linux build. Same codebase produces a Windows .exe (full feature set) and a Linux binary (cross-platform subset with no-op stubs where Win32/WebView2/Velopack don't apply). No Windows regression - all Windows-only code paths are gated by ``Condition="'$(OS)' == 'Windows_NT'"`` in the csproj files plus ``#if WINDOWS`` blocks for the few mixed source files.
+
+### What works on Linux
+- Build compiles cleanly with ``dotnet build`` (0 warnings, 0 errors).
+- 313 tests pass on Linux (out of 313 cross-platform tests; the 6 Windows-only test files are excluded via ``<Compile Remove>``).
+- Process starts, framework initialises, ``MainWindowViewModel`` constructs, slot monitor and seed cache updater run on their timers.
+- ``LinuxClaudePathResolver`` finds ``/usr/bin/claude-desktop`` (the community Debian build).
+
+### Stubbed on Linux for v1.10.19 (deferred to later milestones)
+WMI scanner (procfs deferred to M3), Win32 hide/show, PrintWindow thumbnails (Wayland blocks cross-app capture), HKCU registry + run-at-startup (use ``.desktop`` autostart files), Velopack auto-update (manual download from GitHub Releases), embedded usage WebView (the ``UsagePanelHost`` ContentControl stays empty).
+
+### Architecture changes that enabled this
+- csproj conditionals key off ``'$(OS)' == 'Windows_NT'`` for packages and ``<Compile Remove>``; mixed source files use ``#if WINDOWS``. Full details in ``docs/dev/LEARNINGS.md``.
+- ``MainWindow.axaml`` uses a ``ContentControl x:Name="UsagePanelHost"`` placeholder; WebView setup moved to a Windows-only partial class ``MainWindow.WebView.cs`` via a partial method ``InitializeUsagePanel()``.
+- DI split into cross-platform + ``RegisterWindowsServices`` / ``RegisterLinuxServices`` branches in ``App.axaml.cs``, the Windows branch wrapped in ``#if WINDOWS``.
+- New Linux service folders contain 11 stub implementations (mostly no-op).
+
+### Next milestones
+- M3: real ``ProcfsClaudeProcessScanner`` parsing ``/proc/*/cmdline`` for running Claude electron processes
+- M4: GitHub Actions matrix build for ``windows-latest`` + ``ubuntu-latest`` with separate artefacts per platform
+- M5: AppImage or .deb packaging for Linux
+
 ## v1.10.18 - Released
 **Critical fix #2.** v1.10.17's global exception handler did NOT catch the WebView2 focus crash - because that exception is thrown synchronously inside a Win32 WndProc callback, bypassing the Avalonia dispatcher entirely. Fixed by setting `Focusable="False"` on the embedded NativeWebView so the crash path is never entered. Mouse interaction still works.
 

@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Runtime.Versioning;
 using ComeOnOverDesktopLauncher.Core.Models;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
 
@@ -29,7 +28,6 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 /// <see cref="IClaudeProcessScanner"/> + <see cref="IClaudeProcessClassifier"/>
 /// so classification concerns stay out of the process-control service.
 /// </summary>
-[SupportedOSPlatform("windows")]
 public class SystemProcessService : IProcessService
 {
     public void Start(string fileName, string? arguments = null, bool useShellExecute = false)

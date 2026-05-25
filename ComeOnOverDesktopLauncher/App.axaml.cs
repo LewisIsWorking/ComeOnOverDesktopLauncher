@@ -1,4 +1,3 @@
-using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -6,15 +5,16 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using ComeOnOverDesktopLauncher.Core.Services;
 using ComeOnOverDesktopLauncher.Core.Services.Interfaces;
+using ComeOnOverDesktopLauncher.Core.Services.Linux;
 using ComeOnOverDesktopLauncher.Services;
 using ComeOnOverDesktopLauncher.Services.Interfaces;
+using ComeOnOverDesktopLauncher.Services.Linux;
 using ComeOnOverDesktopLauncher.ViewModels;
 using ComeOnOverDesktopLauncher.Views;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ComeOnOverDesktopLauncher;
 
-[SupportedOSPlatform("windows")]
 public partial class App : Application
 {
     private ServiceProvider? _serviceProvider;
@@ -35,10 +35,10 @@ public partial class App : Application
         _serviceProvider.GetRequiredService<IClaudePathCache>().Refresh();
 
         // Self-heal any Start Menu shortcut the Velopack updater may
-        // have left empty during a previous update apply. See
-        // docs/dev/VELOPACK.md for the upstream bug this works around.
-        // Runs early but after DI so logging is wired up; runs before
-        // MainWindow is shown so it doesn't race with user activity.
+        // have left empty during a previous update apply. On Linux
+        // this resolves to NoOpShortcutHealer which returns
+        // SkippedDevBuild without touching the filesystem. See
+        // docs/dev/VELOPACK.md for the Windows upstream bug.
         _serviceProvider.GetRequiredService<IShortcutHealer>().HealIfMissing();
 
         _slotProcessMonitor = _serviceProvider.GetRequiredService<ISlotProcessMonitor>();
@@ -91,16 +91,10 @@ public partial class App : Application
         _mainWindow.Activate();
     }
 
-    /// <summary>
-    /// Catches unhandled UI-thread exceptions so the launcher
-    /// survives them. Primary motivator (v1.10.17): the known
-    /// Avalonia.Controls.Win.WebView2 focus crash where
-    /// CoreWebView2Controller.MoveFocus throws ArgumentException
-    /// during window activation when the WebView is in a
-    /// transient state. The exception bubbles to the Win32
-    /// message pump and kills the process otherwise. We log
-    /// every swallowed exception so real bugs remain discoverable.
-    /// </summary>
+    /// <summary>Catches unhandled UI-thread exceptions thrown during
+    /// dispatcher operations (Invoke/Post). Does NOT catch exceptions
+    /// thrown synchronously inside a Win32 WndProc - see
+    /// docs/dev/LEARNINGS.md.</summary>
     private void HookGlobalExceptionHandlers()
     {
         Dispatcher.UIThread.UnhandledException += (_, e) =>
@@ -122,20 +116,20 @@ public partial class App : Application
         };
     }
 
-    [SupportedOSPlatform("windows")]
+    /// <summary>Builds the DI container with platform-specific
+    /// service variants chosen via OperatingSystem.IsWindows. Linux
+    /// variants live in *.Services.Linux and are mostly no-op stubs
+    /// for the v1.10.19 build-and-run MVP.</summary>
     private static ServiceCollection ConfigureServices()
     {
         var services = new ServiceCollection();
 
+        // Cross-platform services -----------------------------------------
         services.AddSingleton<IFileSystem, WindowsFileSystem>();
         services.AddSingleton<ILoggingService, FileLoggingService>();
         services.AddSingleton<IProcessService, SystemProcessService>();
-        services.AddSingleton<IClaudeProcessScanner, WmiClaudeProcessScanner>();
         services.AddSingleton<IClaudeProcessClassifier, RegexClaudeProcessClassifier>();
-        services.AddSingleton<IWindowThumbnailService, PrintWindowThumbnailService>();
         services.AddSingleton<IThumbnailPreviewService, AvaloniaThumbnailPreviewService>();
-        services.AddSingleton<IRegistryService, WindowsRegistryService>();
-        services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
         services.AddSingleton<IClaudePathCache, ClaudePathCache>();
         services.AddSingleton<IClaudeVersionResolver, ClaudeVersionResolver>();
         services.AddSingleton<IClaudeInstanceLauncher, ClaudeInstanceLauncher>();
@@ -151,13 +145,6 @@ public partial class App : Application
         services.AddSingleton<IClaudeDiskUsageService, ClaudeDiskUsageService>();
         services.AddSingleton<IStartupService, StartupService>();
         services.AddSingleton<IVersionProvider, VersionProvider>();
-        services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();
-        services.AddSingleton<IUpdateApplyFailureDetector, VelopackLogApplyFailureDetector>();
-        services.AddSingleton<IWindowHider, Win32WindowHider>();
-        services.AddSingleton<IWindowShower, Win32WindowShower>();
-        services.AddSingleton<IShellLinkWriter, WScriptShellLinkWriter>();
-        services.AddSingleton<IIconCacheRefresher, WindowsIconCacheRefresher>();
-        services.AddSingleton<IShortcutHealer, WindowsShortcutHealer>();
         services.AddSingleton<ITrayIconService, TrayIconService>();
         services.AddSingleton<IWindowSnapshotService, WindowSnapshotService>();
         services.AddSingleton<IConfirmDialogService, ConfirmDialogService>();
@@ -165,10 +152,48 @@ public partial class App : Application
         services.AddTransient<ExternalInstanceListViewModel>();
         services.AddTransient<MainWindowViewModel>();
 
+        // Platform-specific services --------------------------------------
+#if WINDOWS
+        if (OperatingSystem.IsWindows())
+            RegisterWindowsServices(services);
+        else
+#endif
+            RegisterLinuxServices(services);
+
         return services;
     }
+
+#if WINDOWS
+#pragma warning disable CA1416 // Windows-only types guarded by OperatingSystem.IsWindows()
+    private static void RegisterWindowsServices(ServiceCollection services)
+    {
+        services.AddSingleton<IClaudeProcessScanner, WmiClaudeProcessScanner>();
+        services.AddSingleton<IWindowThumbnailService, PrintWindowThumbnailService>();
+        services.AddSingleton<IRegistryService, WindowsRegistryService>();
+        services.AddSingleton<IClaudePathResolver, ClaudePathResolver>();
+        services.AddSingleton<IAutoUpdateService, VelopackAutoUpdateService>();
+        services.AddSingleton<IUpdateApplyFailureDetector, VelopackLogApplyFailureDetector>();
+        services.AddSingleton<IWindowHider, Win32WindowHider>();
+        services.AddSingleton<IWindowShower, Win32WindowShower>();
+        services.AddSingleton<IShellLinkWriter, WScriptShellLinkWriter>();
+        services.AddSingleton<IIconCacheRefresher, WindowsIconCacheRefresher>();
+        services.AddSingleton<IShortcutHealer, WindowsShortcutHealer>();
+    }
+#pragma warning restore CA1416
+#endif
+
+    private static void RegisterLinuxServices(ServiceCollection services)
+    {
+        services.AddSingleton<IClaudeProcessScanner, EmptyClaudeProcessScanner>();
+        services.AddSingleton<IWindowThumbnailService, NoOpThumbnailService>();
+        services.AddSingleton<IRegistryService, NoOpRegistryService>();
+        services.AddSingleton<IClaudePathResolver, LinuxClaudePathResolver>();
+        services.AddSingleton<IAutoUpdateService, NoOpAutoUpdateService>();
+        services.AddSingleton<IUpdateApplyFailureDetector, NoOpUpdateApplyFailureDetector>();
+        services.AddSingleton<IWindowHider, NoOpWindowHider>();
+        services.AddSingleton<IWindowShower, NoOpWindowShower>();
+        services.AddSingleton<IShellLinkWriter, NoOpShellLinkWriter>();
+        services.AddSingleton<IIconCacheRefresher, NoOpIconCacheRefresher>();
+        services.AddSingleton<IShortcutHealer, NoOpShortcutHealer>();
+    }
 }
-
-
-
-
