@@ -101,4 +101,30 @@ public class RegexClaudeProcessClassifierTests
 
         Assert.Equal(start, _sut.TryClassifyAsExternal(info)!.StartTime);
     }
+    [Fact]
+    public void TryClassifyAsSlot_LinuxForwardSlashPath_ReturnsSlotInfo()
+    {
+        // Real Linux slot launch line: bash launcher + electron + asar + flag.
+        var info = Claude("/usr/lib/claude-desktop/node_modules/electron/dist/electron " +
+                         "/usr/lib/claude-desktop/node_modules/electron/dist/resources/app.asar " +
+                         "--no-sandbox --user-data-dir=/home/pathwars/.config/ClaudeSlot5",
+                         pid: 9834);
+
+        var result = _sut.TryClassifyAsSlot(info);
+
+        Assert.NotNull(result);
+        Assert.Equal(9834, result!.ProcessId);
+        Assert.Equal(5, result.SlotNumber);
+    }
+
+    [Fact]
+    public void TryClassifyAsSlot_LinuxExternalCmdline_ReturnsNull()
+    {
+        // The launcher-unaware Claude install (default user-data dir).
+        var info = Claude("/usr/lib/claude-desktop/node_modules/electron/dist/electron " +
+                         "/usr/lib/claude-desktop/node_modules/electron/dist/resources/app.asar " +
+                         "--no-sandbox --ozone-platform=wayland");
+        Assert.Null(_sut.TryClassifyAsSlot(info));
+    }
+
 }

@@ -184,7 +184,7 @@ public partial class App : Application
 
     private static void RegisterLinuxServices(ServiceCollection services)
     {
-        services.AddSingleton<IClaudeProcessScanner, EmptyClaudeProcessScanner>();
+        services.AddSingleton<IClaudeProcessScanner, ProcfsClaudeProcessScanner>();
         services.AddSingleton<IWindowThumbnailService, NoOpThumbnailService>();
         services.AddSingleton<IRegistryService, NoOpRegistryService>();
         services.AddSingleton<IClaudePathResolver, LinuxClaudePathResolver>();

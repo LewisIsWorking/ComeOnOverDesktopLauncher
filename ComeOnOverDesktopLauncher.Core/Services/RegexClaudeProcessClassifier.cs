@@ -15,7 +15,7 @@ namespace ComeOnOverDesktopLauncher.Core.Services;
 public class RegexClaudeProcessClassifier : IClaudeProcessClassifier
 {
     private static readonly Regex SlotPattern = new(
-        @"--user-data-dir=""?[^""]*\\ClaudeSlot(\d+)""?",
+        @"--user-data-dir=""?[^""]*[\\/]ClaudeSlot(\d+)""?",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     public SlotProcessInfo? TryClassifyAsSlot(ClaudeProcessInfo process)

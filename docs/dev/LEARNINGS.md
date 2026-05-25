@@ -98,3 +98,14 @@ Three layered mechanisms keep the source tree single-targeted while producing tw
 **XAML can't be conditionally compiled** the way C# can. `Avalonia.Controls.WebView`'s `<NativeWebView>` element won't resolve on Linux because the package isn't there. Solution: keep the XAML cross-platform with a placeholder (`<ContentControl x:Name="UsagePanelHost"/>`), wire any Windows-only control creation up in code-behind, and split the code-behind into a cross-platform partial class plus a `<Compile Remove>`'d Windows-only partial class. The cross-platform partial declares an unimplemented partial method like `partial void InitializeUsagePanel();` which the Windows partial implements; on Linux the call site compiles away to nothing.
 
 **SystemProcessService had `[SupportedOSPlatform("windows")]`** despite using cross-platform `System.Diagnostics.Process` APIs. Removed in v1.10.19. `MainWindowHandle` returns `IntPtr.Zero` on Linux processes which is harmless; the call works it just always returns no-window. Don't add platform attributes just because the class was *written* on Windows; only add them when the APIs actually demand it.
+
+
+## /proc/PID/stat: anchor on the LAST `)`, not the first space (v1.10.20)
+
+The Linux `/proc/PID/stat` line is space-separated, but field 2 (`comm`) is the executable name in parentheses and **may contain spaces or even nested parens** if a process renamed itself via `prctl(PR_SET_NAME)`. A naive `line.Split(' ')` then `parts[3]` for the parent PID will break catastrophically for any such process — and silently, since most processes have well-behaved names. The fix in `ProcfsParser.ParseStat` is to find the *last* `)` in the line, then split the remainder. Field indices after that are stable: `[0]` = state, `[1]` = ppid, `[19]` = starttime in clock ticks.
+
+Convert clock ticks to wall-clock seconds with `sysconf(_SC_CLK_TCK)` — universally 100 on Linux. Then `unix_seconds = btime + (starttime / 100)` where `btime` comes from the top of `/proc/stat`. Don't read `/proc/stat` per-process; cache the btime after first read since it doesn't change for the launcher's lifetime.
+
+For the cmdline blob: `/proc/PID/cmdline` is NUL-separated argv, often with a trailing NUL. UTF-8 decode then `Replace('\0', ' ').TrimEnd()` gives a Windows-WMI-equivalent space-separated string. Don't try to be clever about quoting; the launcher's downstream classifier only cares about flag presence (`--user-data-dir=`, `--type=`), not about reconstructing the original argv.
+
+When walking `/proc`, **filter directory names to all-digit strings** (`IsPidDirectoryName`) — `/proc` contains `sys`, `bus`, `self`, `thread-self`, `cpuinfo`, etc. that are not processes. And tolerate every per-PID file read failing: processes can exit mid-scan (FileNotFoundException, DirectoryNotFoundException), and kernel threads/other users' processes may give UnauthorizedAccessException. Swallow all four exceptions per-entry, never abort the whole scan.
